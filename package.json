@@ -1,5 +1,5 @@
 {
-  "name": "maintainerr-discord",
+  "name": "maintainerr_discord",
   "version": "1.0.0",
   "description": "Discord bot for interpreting Maintainerr test media results",
   "packageManager": "yarn@1.22.22",
