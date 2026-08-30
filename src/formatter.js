@@ -2,6 +2,7 @@ import {
   ACTION_DEFINITIONS,
   FIELD_LABEL_RULES,
   SECOND_VALUE_LABELS,
+  UNARY_ACTIONS,
 } from './rule-definitions.js'
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
@@ -113,6 +114,12 @@ function formatFieldValue(rule, side) {
   return formatValue(value).replace(/^"(.*)"$/, '$1')
 }
 
+function countOf(value) {
+  if (Array.isArray(value)) return value.length
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return null
+}
+
 function describeWhy(rule) {
   const firstLabel = getDisplayLabel(rule.firstValueName)
   const firstValue = formatFieldValue(rule, 'first')
@@ -122,6 +129,8 @@ function describeWhy(rule) {
     firstLabel,
     firstValue,
     secondValue,
+    firstCount: countOf(rule.firstValue) ?? 'an unknown number of',
+    secondCount: countOf(rule.secondValue) ?? secondValue,
   }
 
   if (definition) {
@@ -151,7 +160,12 @@ function describeExpectation(rule) {
       firstLabel,
       secondLabel,
       secondValue,
+      secondCount: countOf(rule.secondValue) ?? secondValue,
     })
+  }
+
+  if (UNARY_ACTIONS.has(rule.action)) {
+    return `${firstLabel} ${formatAction(rule.action)}.`
   }
 
   return `${firstLabel} ${formatAction(rule.action)} ${secondLabel}.`
@@ -236,9 +250,11 @@ function createRuleDetails(rule) {
   }
 
   return {
-    summary: `${getDisplayLabel(rule.firstValueName)} ${formatAction(rule.action)} ${getDisplayLabel(
-      rule.secondValueName
-    )}`,
+    summary: UNARY_ACTIONS.has(rule.action)
+      ? `${getDisplayLabel(rule.firstValueName)} ${formatAction(rule.action)}`
+      : `${getDisplayLabel(rule.firstValueName)} ${formatAction(
+          rule.action
+        )} ${getDisplayLabel(rule.secondValueName)}`,
     expectation: describeExpectation(rule),
     result: rule.result ? 'Passed' : 'Failed',
     why: describeWhy(rule),

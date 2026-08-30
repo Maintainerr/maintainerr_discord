@@ -67,6 +67,71 @@ export const ACTION_DEFINITIONS = {
   smaller_equals: {
     label: 'is less than or equal to',
   },
+  in_next: {
+    label: 'is within the next',
+  },
+  contains_all: {
+    label: 'contains all of',
+    expectation: '{firstLabel} must contain every value in {secondValue}.',
+    whyTrue: '{firstLabel} contains every value in {secondValue}.',
+    whyFalse: '{firstLabel} is missing at least one value from {secondValue}.',
+  },
+  not_contains_all: {
+    label: 'does not contain all of',
+    expectation: '{firstLabel} must not contain every value in {secondValue}.',
+    whyTrue: '{firstLabel} is missing at least one value from {secondValue}.',
+    whyFalse:
+      '{firstLabel} contains every value in {secondValue}, so the condition failed.',
+  },
+  not_contains_partial: {
+    label: 'does not partially contain',
+    expectation: '{firstLabel} must not partially match {secondValue}.',
+    whyTrue: '{firstLabel} does not partially match {secondValue}.',
+    whyFalse:
+      '{firstLabel} partially matches {secondValue}, so the condition failed.',
+  },
+  count_equals: {
+    label: 'has a count equal to',
+    expectation: '{firstLabel} must contain exactly {secondCount} items.',
+    whyTrue: '{firstLabel} contains {firstCount} items, which matches {secondCount}.',
+    whyFalse: '{firstLabel} contains {firstCount} items, not {secondCount}.',
+  },
+  count_not_equals: {
+    label: 'does not have a count equal to',
+    expectation: '{firstLabel} must not contain exactly {secondCount} items.',
+    whyTrue:
+      '{firstLabel} contains {firstCount} items, which differs from {secondCount}.',
+    whyFalse:
+      '{firstLabel} contains exactly {secondCount} items, so the condition failed.',
+  },
+  count_bigger: {
+    label: 'has a count greater than',
+    expectation: '{firstLabel} must contain more than {secondCount} items.',
+    whyTrue:
+      '{firstLabel} contains {firstCount} items, which is more than {secondCount}.',
+    whyFalse:
+      '{firstLabel} contains {firstCount} items, which is not more than {secondCount}.',
+  },
+  count_smaller: {
+    label: 'has a count less than',
+    expectation: '{firstLabel} must contain fewer than {secondCount} items.',
+    whyTrue:
+      '{firstLabel} contains {firstCount} items, which is fewer than {secondCount}.',
+    whyFalse:
+      '{firstLabel} contains {firstCount} items, which is not fewer than {secondCount}.',
+  },
+  exists: {
+    label: 'exists',
+    expectation: '{firstLabel} must have a value.',
+    whyTrue: '{firstLabel} has a value ({firstValue}).',
+    whyFalse: '{firstLabel} is empty or missing.',
+  },
+  not_exists: {
+    label: 'does not exist',
+    expectation: '{firstLabel} must be empty or missing.',
+    whyTrue: '{firstLabel} is empty or missing.',
+    whyFalse: '{firstLabel} has a value ({firstValue}), so the condition failed.',
+  },
 }
 
 export const FIELD_LABEL_RULES = [
@@ -110,3 +175,8 @@ export const SECOND_VALUE_LABELS = {
   number: 'Threshold',
   custom_days: 'Cutoff',
 }
+
+// Unary actions carry no second operand. The server omits secondValueName
+// entirely for these, so anything that renders "<first> <action> <second>"
+// has to drop the trailing half rather than print a placeholder.
+export const UNARY_ACTIONS = new Set(['exists', 'not_exists'])
