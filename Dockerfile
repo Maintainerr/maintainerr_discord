@@ -1,3 +1,10 @@
+# This image is published to a PUBLIC registry
+# (ghcr.io/maintainerr/maintainerr_discord) on every push to main, so nothing
+# secret may enter it: no ENV secrets, no copied config, no .env. DISCORD_TOKEN
+# is injected at runtime by the deployment and is never baked in. Only
+# package.json, yarn.lock and src are copied; .dockerignore keeps .env, .env.*,
+# .git and README.md out of the build context.
+
 FROM node:26-alpine
 
 WORKDIR /app

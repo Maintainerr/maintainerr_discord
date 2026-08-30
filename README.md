@@ -60,6 +60,11 @@ build is tagged twice: `latest`, and the full commit sha it was built from.
 Deployments that want a fixed version should pin the sha tag, since `latest`
 moves with every merge.
 
+The package is public, so treat the image as world readable. Nothing secret
+goes into it: no ENV secrets, no copied config, no `.env`. `DISCORD_TOKEN` is
+injected at runtime by whatever runs the container, and only `package.json`,
+`yarn.lock` and `src` are copied in.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
