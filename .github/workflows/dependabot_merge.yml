@@ -1,0 +1,52 @@
+name: Dependabot auto-merge
+
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+  # Needed to dispatch docker-publish below.
+  actions: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-commit-verification: true
+
+      # No review step: unlike the main repo, this repo's ruleset requires no
+      # approving review, so approving would be ceremony. Majors stay manual.
+      - name: Merge once checks pass
+        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
+        run: |
+          set -euo pipefail
+
+          # Watched rather than gated on required checks: pr-check only runs on
+          # pull_request, so making it a required check would permanently block
+          # direct pushes to main.
+          for _ in $(seq 1 30); do
+            if gh pr checks "$PR_URL" 2>/dev/null | grep -q 'pr-check'; then break; fi
+            sleep 10
+          done
+
+          gh pr checks "$PR_URL" --watch --interval 30
+          gh pr merge --squash --delete-branch "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A push made with GITHUB_TOKEN does not trigger other workflows, so the
+      # merge above would land on main without docker-publish ever running and
+      # the update would never reach the image. workflow_dispatch is the
+      # documented exception to that rule, so ask for the publish explicitly.
+      - name: Publish the merged update
+        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
+        run: gh workflow run docker-publish.yml --ref main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
