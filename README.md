@@ -35,20 +35,19 @@ Guilds and Direct Messages intents.
 
 ## Running it
 
-With Docker:
+With podman:
 
 ```
-docker run -d --name maintainerr_discord \
+podman run -d --name maintainerr_discord \
   -e DISCORD_TOKEN=your-token-here \
   ghcr.io/maintainerr/maintainerr_discord:latest
 ```
 
-The image is OCI, so `podman run` accepts exactly the same arguments. Swap
-`docker` for `podman` in the command above and nothing else changes. The
-production host runs it under podman.
+The image is OCI, so any runtime can pull it, but this project is podman-only:
+it is built with buildah in CI and run under podman in production.
 
-The bot shuts down on SIGTERM, so `docker stop` and `podman stop` close the
-Discord connection cleanly rather than leaving the session hanging.
+The bot shuts down on SIGTERM, so `podman stop` closes the Discord connection
+cleanly rather than leaving the session hanging.
 
 From source, with Node 26 or newer:
 

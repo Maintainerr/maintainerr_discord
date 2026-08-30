@@ -5,7 +5,7 @@ on: pull_request_target
 permissions:
   contents: write
   pull-requests: write
-  # Needed to dispatch docker-publish below.
+  # Needed to dispatch the publish workflow below.
   actions: write
 
 jobs:
@@ -81,11 +81,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # A push made with GITHUB_TOKEN does not trigger other workflows, so the
-      # merge above would land on main without docker-publish ever running and
+      # merge above would land on main without the publish workflow ever running and
       # the update would never reach the image. workflow_dispatch is the
       # documented exception to that rule, so ask for the publish explicitly.
       - name: Publish the merged update
         if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
-        run: gh workflow run docker-publish.yml --ref main
+        run: gh workflow run publish.yml --ref main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
