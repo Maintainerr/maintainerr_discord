@@ -5,6 +5,6 @@ npm-debug.log
 .env
 .env.*
 .claude
-Dockerfile*
-docker-compose*.yml
+Containerfile*
+compose*.y*ml
 README.md
