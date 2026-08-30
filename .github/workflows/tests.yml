@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      # No install step: the tests use node:test from the standard library and
+      # the modules under test import nothing outside src/, so there is no
+      # dependency tree to resolve.
+      # npm rather than yarn: npm ships with Node, and nothing is being
+      # installed here, so there is no reason to depend on yarn being present.
+      - name: Run tests
+        run: npm test
