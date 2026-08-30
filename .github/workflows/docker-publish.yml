@@ -1,6 +1,9 @@
 name: docker-publish
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -31,6 +34,7 @@ jobs:
           images: ghcr.io/maintainerr/maintainerr_discord
           tags: |
             type=raw,value=latest
+            type=sha,format=long
 
       - name: Build and push image
         uses: docker/build-push-action@v7
