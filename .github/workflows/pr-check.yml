@@ -19,7 +19,7 @@ jobs:
 
       # buildah rather than docker/buildx -- this project is podman-only.
       - name: Build image without pushing
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/buildah-build@v3
         with:
           image: maintainerr_discord
           tags: pr
