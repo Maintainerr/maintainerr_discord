@@ -24,7 +24,7 @@ jobs:
       # `COPY . .`. The ignore file is defence in depth. Keep both that way.
       - name: Build image
         id: build
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/buildah-build@v3
         with:
           image: maintainerr_discord
           # `latest` moves with every merge. The sha tag is immutable, so a
