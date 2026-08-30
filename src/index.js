@@ -120,20 +120,29 @@ const redactTokens = (text) =>
   )
 
 // Log shape for anything that might be a discord.js REST error: keep what is
-// worth diagnosing, drop the credential. Non-REST errors pass through so their
-// stack survives intact.
-function describeError(err) {
-  if (!err || typeof err !== 'object' || !('url' in err)) return err
+// worth diagnosing, drop the credential. Errors without an own url are scrubbed
+// rather than passed through, because a failed request can surface as a plain
+// Error carrying the same token in its message, its stack, or a nested cause.
+// requestBody is deliberately absent: it holds the user's pasted DM content.
+function describeError(err, depth = 0) {
+  if (typeof err === 'string') return redactTokens(err)
+  if (!err || typeof err !== 'object') return err
+  // Cause chains can be cyclic, and a truncation marker beats recursing forever.
+  if (depth > 3) return '[cause chain truncated]'
 
-  return {
+  const described = {
     name: err.name,
-    message: err.message,
+    message: typeof err.message === 'string' ? redactTokens(err.message) : err.message,
     code: err.code,
     status: err.status,
     method: err.method,
-    url: redactTokens(err.url),
-    stack: err.stack ? redactTokens(err.stack) : undefined,
+    stack: typeof err.stack === 'string' ? redactTokens(err.stack) : undefined,
   }
+
+  if ('url' in err) described.url = redactTokens(err.url)
+  if (err.cause) described.cause = describeError(err.cause, depth + 1)
+
+  return described
 }
 
 client.on('error', (err) =>
