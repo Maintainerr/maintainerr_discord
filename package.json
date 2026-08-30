@@ -1,0 +1,20 @@
+{
+  "name": "maintainerr_discord",
+  "version": "1.0.0",
+  "description": "Discord bot for interpreting Maintainerr test media results",
+  "packageManager": "yarn@1.22.22",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "yaml": "^2.8.3"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}
