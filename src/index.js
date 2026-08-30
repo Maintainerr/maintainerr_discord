@@ -387,4 +387,30 @@ function chunkBlocks(blocks, maxLength) {
   return chunks
 }
 
+// Container runtimes stop the bot with SIGTERM and wait a short grace period
+// before SIGKILL. Exiting without destroying the client leaves the gateway
+// session open, so Discord keeps showing the bot online until the session
+// times out on its own. Destroy it first, then exit.
+let shuttingDown = false
+
+async function shutdown(signal) {
+  // Both signals can arrive, and a second one during teardown must not start
+  // teardown again.
+  if (shuttingDown) return
+  shuttingDown = true
+
+  console.log(`Received ${signal}, closing the Discord connection.`)
+
+  try {
+    await client.destroy()
+  } catch (err) {
+    console.error('Error while closing the Discord connection:', describeError(err))
+  }
+
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
+
 client.login(process.env.DISCORD_TOKEN)

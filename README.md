@@ -43,6 +43,13 @@ docker run -d --name maintainerr_discord \
   ghcr.io/maintainerr/maintainerr_discord:latest
 ```
 
+The image is OCI, so `podman run` accepts exactly the same arguments. Swap
+`docker` for `podman` in the command above and nothing else changes. The
+production host runs it under podman.
+
+The bot shuts down on SIGTERM, so `docker stop` and `podman stop` close the
+Discord connection cleanly rather than leaving the session hanging.
+
 From source, with Node 26 or newer:
 
 ```
