@@ -106,12 +106,62 @@ client.on('interactionCreate', async (interaction) => {
   await handleSlashCommand(interaction)
 })
 
-client.on('error', (err) => console.error('Discord client error:', err))
+// discord.js puts the full request URL on its REST errors (DiscordAPIError.url
+// and HTTPError.url, both unredacted), and Discord embeds the interaction token
+// directly in those paths:
+//   /interactions/{interaction.id}/{interaction.token}/callback
+//   /webhooks/{application.id}/{interaction.token}/messages/{message.id}
+// That token stays usable for 15 minutes, so it must never reach a log file.
+// Bounded and anchored on purpose: one pass, no nested quantifiers.
+const redactTokens = (text) =>
+  String(text).replace(
+    /\/(interactions|webhooks)\/(\d{1,20})\/[^/?#\s]+/g,
+    '/$1/$2/[redacted]'
+  )
+
+// Log shape for anything that might be a discord.js REST error: keep what is
+// worth diagnosing, drop the credential. Non-REST errors pass through so their
+// stack survives intact.
+function describeError(err) {
+  if (!err || typeof err !== 'object' || !('url' in err)) return err
+
+  return {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    status: err.status,
+    method: err.method,
+    url: redactTokens(err.url),
+    stack: err.stack ? redactTokens(err.stack) : undefined,
+  }
+}
+
+client.on('error', (err) =>
+  console.error('Discord client error:', describeError(err))
+)
 process.on('unhandledRejection', (err) =>
-  console.error('Unhandled rejection:', err)
+  console.error('Unhandled rejection:', describeError(err))
 )
 
+// Discord's API error for "Cannot send messages to this user", which is what
+// a user who blocks DMs from server members produces. Any other failure is
+// ours, so don't blame their privacy settings for it.
+const CANNOT_SEND_DM = 50007
+
 async function handleSlashCommand(interaction) {
+  // Discord expects an initial response within 3 seconds or it shows the user
+  // "The application did not respond" and invalidates the interaction token.
+  // Opening a DM and sending the instructions is two API round-trips, which
+  // regularly overruns that budget: the DM arrives but the acknowledgement is
+  // already too late. Defer first, which buys 15 minutes, then do the work.
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+  } catch (err) {
+    // Nothing left to reply with if even the deferral missed the window.
+    console.error('handleSlashCommand could not defer:', describeError(err))
+    return
+  }
+
   try {
     const dm = await interaction.user.createDM()
     await dm.send(
@@ -126,27 +176,22 @@ async function handleSlashCommand(interaction) {
         'You can paste another result here any time without having to start a new session.\n'
     )
 
-    await interaction.reply({
-      content:
-        "Check your DMs. I'll decode your Maintainerr test result there.",
-      flags: MessageFlags.Ephemeral,
+    await interaction.editReply({
+      content: "Check your DMs. I'll decode your Maintainerr test result there.",
     })
   } catch (err) {
-    console.error('handleSlashCommand error:', err)
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({
-        content:
-          "I couldn't send you a DM. Make sure your privacy settings allow DMs from members of this server.",
-        flags: MessageFlags.Ephemeral,
-      })
-      return
-    }
+    console.error('handleSlashCommand error:', describeError(err))
 
-    await interaction.reply({
-      content:
-        "I couldn't send you a DM. Make sure your privacy settings allow DMs from members of this server.",
-      flags: MessageFlags.Ephemeral,
-    })
+    const content =
+      err?.code === CANNOT_SEND_DM
+        ? "I couldn't send you a DM. Make sure your privacy settings allow DMs from members of this server."
+        : 'Something went wrong opening your DM. Please try again in a moment.'
+
+    try {
+      await interaction.editReply({ content })
+    } catch (replyErr) {
+      console.error('handleSlashCommand could not report failure:', describeError(replyErr))
+    }
   }
 }
 
