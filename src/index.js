@@ -106,9 +106,41 @@ client.on('interactionCreate', async (interaction) => {
   await handleSlashCommand(interaction)
 })
 
-client.on('error', (err) => console.error('Discord client error:', err))
+// discord.js puts the full request URL on its REST errors (DiscordAPIError.url
+// and HTTPError.url, both unredacted), and Discord embeds the interaction token
+// directly in those paths:
+//   /interactions/{interaction.id}/{interaction.token}/callback
+//   /webhooks/{application.id}/{interaction.token}/messages/{message.id}
+// That token stays usable for 15 minutes, so it must never reach a log file.
+// Bounded and anchored on purpose: one pass, no nested quantifiers.
+const redactTokens = (text) =>
+  String(text).replace(
+    /\/(interactions|webhooks)\/(\d{1,20})\/[^/?#\s]+/g,
+    '/$1/$2/[redacted]'
+  )
+
+// Log shape for anything that might be a discord.js REST error: keep what is
+// worth diagnosing, drop the credential. Non-REST errors pass through so their
+// stack survives intact.
+function describeError(err) {
+  if (!err || typeof err !== 'object' || !('url' in err)) return err
+
+  return {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    status: err.status,
+    method: err.method,
+    url: redactTokens(err.url),
+    stack: err.stack ? redactTokens(err.stack) : undefined,
+  }
+}
+
+client.on('error', (err) =>
+  console.error('Discord client error:', describeError(err))
+)
 process.on('unhandledRejection', (err) =>
-  console.error('Unhandled rejection:', err)
+  console.error('Unhandled rejection:', describeError(err))
 )
 
 // Discord's API error for "Cannot send messages to this user", which is what
@@ -126,7 +158,7 @@ async function handleSlashCommand(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral })
   } catch (err) {
     // Nothing left to reply with if even the deferral missed the window.
-    console.error('handleSlashCommand could not defer:', err)
+    console.error('handleSlashCommand could not defer:', describeError(err))
     return
   }
 
@@ -148,7 +180,7 @@ async function handleSlashCommand(interaction) {
       content: "Check your DMs. I'll decode your Maintainerr test result there.",
     })
   } catch (err) {
-    console.error('handleSlashCommand error:', err)
+    console.error('handleSlashCommand error:', describeError(err))
 
     const content =
       err?.code === CANNOT_SEND_DM
@@ -158,7 +190,7 @@ async function handleSlashCommand(interaction) {
     try {
       await interaction.editReply({ content })
     } catch (replyErr) {
-      console.error('handleSlashCommand could not report failure:', replyErr)
+      console.error('handleSlashCommand could not report failure:', describeError(replyErr))
     }
   }
 }
