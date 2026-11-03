@@ -57,6 +57,8 @@ export function createCommandRegistry(
         ctx.logger.debug(
           `Registered slash commands in guild ${guild.name} (${guild.id}).`
         )
+        // Global copies from an earlier global registration would linger.
+        await upsertCommands(client.application.commands, [], managedNames)
         return
       }
 

@@ -46,7 +46,7 @@ are reported together and do not print supplied values.
 | Variable                      | Default                         | Purpose                                                                                                                             |
 | ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `DISCORD_TOKEN`               | required                        | Discord bot token.                                                                                                                  |
-| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally.                                                                                |
+| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally, and remove the bot's global copies.                                            |
 | `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                                                                                  |
 | `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error`, or `silent`.                                                                                      |
 | `FEATURE_SMART_DECODER`       | `false`                         | Decode channel pastes in threads, add likely fixes and generated docs links in channels and DMs.                                    |
