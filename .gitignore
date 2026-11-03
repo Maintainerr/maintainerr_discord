@@ -1,7 +1,9 @@
 # Logs
 logs
 *.log
-!/AUDIT.log
+
+# Maintainer planning and audit notes are kept local, not published.
+/PLAN.md
 data/
 *.sqlite
 *.sqlite-wal

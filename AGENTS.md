@@ -1,7 +1,7 @@
 # Maintainerr Discord Bot Rules
 
-Read [PLAN.md](PLAN.md) before editing. Its scope, phase boundaries, and locked
-decisions govern this repository.
+The bot's phase plan and audit log are maintainer-held and deliberately not
+published here. Everything a contributor needs is in this file.
 
 The shared conventions come from the Maintainerr app's
 [agent index](https://github.com/Maintainerr/Maintainerr/blob/main/AGENTS.md),
@@ -25,8 +25,8 @@ Reviewed against app `main` at `3dbd5463a82beb4cd970a41c3afd042af4fccfd8` on
   instead of prefixing them with underscores.
 - Use debug logging by default. Warnings identify something a human must act on;
   routine diagnostics and caught-error detail belong at debug level.
-- Preserve the original formatter and rule definitions, and the import-only
-  changes in their existing tests, as required by PLAN.md.
+- Preserve the original formatter and rule definitions byte for byte, and keep
+  their existing tests to import-path changes only.
 
 ## Text
 
