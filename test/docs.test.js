@@ -122,3 +122,48 @@ test('a persisted unchanged tree skips downloads after reboot and a changed sha 
   assert.equal(index.search('settings').length, 0)
   assert.match(index.ruleLink('sw_lastWatched'), /#playback-date$/)
 })
+
+test('API reference pages are not indexed, and changing that rule forces a reindex', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const config = {
+    docsRepository: 'Example/docs',
+    docsRef: 'main',
+    docsOrigin: 'https://docs.example.test',
+  }
+  const downloads = []
+  const fetchFn = async (url) => {
+    if (url.includes('/git/trees/'))
+      return Response.json({
+        sha: 'fake-sha',
+        tree: [
+          { type: 'blob', path: 'docs/Rules.mdx' },
+          { type: 'blob', path: 'docs/api/rules.md' },
+        ],
+      })
+    downloads.push(url.split('/').at(-1))
+    return new Response('# Rules\n## Matching\nhow rules match')
+  }
+  const index = createDocsIndex(store)
+  // Built for the same docs commit before API pages were skipped.
+  index.replace(
+    [
+      {
+        page: 'Rules API',
+        heading: 'Stale',
+        content: 'stale integrator text',
+        url: 'https://docs.example.test/api/rules/',
+        source_path: 'docs/api/rules.md',
+      },
+    ],
+    JSON.stringify({
+      repository: config.docsRepository,
+      ref: config.docsRef,
+      origin: config.docsOrigin,
+      sha: 'fake-sha',
+    })
+  )
+  await refreshDocs(index, config, fetchFn)
+  assert.deepEqual(downloads, ['Rules.mdx'])
+  assert.equal(index.search('stale').length, 0)
+})

@@ -203,6 +203,10 @@ export function createDocsIndex(store) {
   }
 }
 
+// API reference pages are written for integrators. They outrank the user docs
+// on keywords and are never the right answer to a support question.
+const SKIPPED_DOCS = ['docs/api/']
+
 export async function refreshDocs(index, config, fetchFn = fetch) {
   const response = await fetchFn(
     `https://api.github.com/repos/${config.docsRepository}/git/trees/${encodeURIComponent(config.docsRef)}?recursive=1`,
@@ -226,6 +230,7 @@ export async function refreshDocs(index, config, fetchFn = fetch) {
     (entry) =>
       entry.type === 'blob' &&
       entry.path.startsWith('docs/') &&
+      !SKIPPED_DOCS.some((prefix) => entry.path.startsWith(prefix)) &&
       (entry.path.endsWith('.md') || entry.path.endsWith('.mdx'))
   )
   if (!files.length) throw new Error('Docs tree contains no documentation.')
@@ -234,6 +239,9 @@ export async function refreshDocs(index, config, fetchFn = fetch) {
     ref: config.docsRef,
     origin: config.docsOrigin,
     sha: tree.sha,
+    // Part of the cache key, so changing what is skipped forces a reindex
+    // instead of reusing an index built under the old rule.
+    skipped: SKIPPED_DOCS,
   })
   if (index.source() === source && index.count()) return index.count()
   const chunks = []

@@ -24,6 +24,12 @@ export function describeError(err, depth = 0) {
   return described
 }
 
+// A DM, or the channel or forum a message was posted in, for usage lines.
+export const where = (message) =>
+  message.guildId === null
+    ? 'DM'
+    : `#${(message.channel?.isThread?.() ? message.channel.parent : message.channel)?.name}`
+
 export function createLogger(level = 'debug', output = console) {
   const levels = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 }
   const methods = { debug: 'debug', log: 'info', warn: 'warn', error: 'error' }

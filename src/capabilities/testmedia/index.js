@@ -2,11 +2,13 @@ import { ChannelType } from 'discord.js'
 import { commands } from '../../commands/testmedia.js'
 import { allowsScreenshot, inSupportChannel } from './scope.js'
 import {
+  findPaste,
   handleDM,
   handleChannelMessage,
   handleScreenshot,
   isTestMediaText,
 } from './decoder.js'
+import { where } from '../../lib/logging.js'
 
 export default {
   name: 'testmedia',
@@ -22,12 +24,21 @@ export default {
         (await handleScreenshot(message, ctx))
       )
         return
-      if (message.channel.type === ChannelType.DM) await handleDM(message, ctx)
-      else if (
+      if (message.channel.type === ChannelType.DM) {
+        const paste = await findPaste(message, ctx)
+        await handleDM(message, ctx, paste ?? message.content)
+        ctx.logger.debug(
+          `[dm] ${message.author.tag}: ${paste ? 'Test Media paste decoded' : 'no paste found'}`
+        )
+      } else if (
         ctx.config.featureSmartDecoder &&
         inSupportChannel(message, ctx.config)
-      )
-        await handleChannelMessage(message, ctx)
+      ) {
+        const paste = await findPaste(message, ctx)
+        if (!paste) return
+        await handleChannelMessage(message, ctx, paste)
+        ctx.logger.debug(`[decode] ${message.author.tag} in ${where(message)}`)
+      }
     })
   },
 }

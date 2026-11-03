@@ -5,7 +5,10 @@ import { buildResultEmbeds } from './embeds.js'
 import { describeError } from '../../lib/logging.js'
 import { suggestFixes, ruleFields, payloadItems } from './hints.js'
 import { safeMessage } from '../../lib/http.js'
-import { downloadAttachment } from '../../lib/attachments.js'
+import {
+  classifyAttachment,
+  downloadAttachment,
+} from '../../lib/attachments.js'
 
 const CANNOT_SEND_DM = 50007
 
@@ -15,6 +18,72 @@ function parseMaintainerrPayload(rawText) {
   } catch {
     return parseYaml(rawText)
   }
+}
+
+const isTestMediaPayload = (parsed) =>
+  payloadItems(parsed).some((item) => Array.isArray(item?.sectionResults)) ||
+  (parsed?.code === 1 && Array.isArray(parsed.result) && !parsed.result.length)
+
+// People write a sentence before the paste, so look past it: the whole message,
+// then a fenced block, then the outermost braces.
+export function extractPayload(content) {
+  const text = content.trim()
+  const candidates = [
+    text.replace(/^```(?:json|yaml|yml)?\s*([\s\S]*?)```$/i, '$1'),
+  ]
+  const fence = text.indexOf('```')
+  const fenceEnd = fence === -1 ? -1 : text.indexOf('```', fence + 3)
+  if (fenceEnd !== -1) {
+    const block = text.slice(fence + 3, fenceEnd)
+    candidates.push(block.slice(block.indexOf('\n') + 1))
+  }
+  const open = text.indexOf('{')
+  const close = text.lastIndexOf('}')
+  if (open !== -1 && close > open) candidates.push(text.slice(open, close + 1))
+  for (const candidate of candidates) {
+    let parsed
+    try {
+      parsed = parseMaintainerrPayload(candidate)
+    } catch {
+      continue
+    }
+    if (isTestMediaPayload(parsed)) return parsed
+  }
+  return null
+}
+
+const pastes = new WeakMap()
+
+// Discord turns a paste longer than one message into an attached text file and
+// leaves the message empty. Both listeners see the same message, so share one
+// download between them.
+export function findPaste(message, ctx) {
+  if (!pastes.has(message))
+    pastes.set(
+      message,
+      (async () => {
+        if (extractPayload(message.content)) return message.content
+        const file = message.attachments?.find(
+          (attachment) =>
+            classifyAttachment(attachment, ctx.config.attachmentMaxBytes)
+              .kind === 'text'
+        )
+        if (!file) return null
+        try {
+          const { bytes } = await downloadAttachment(
+            file,
+            ctx.config.attachmentMaxBytes,
+            ctx.fetch
+          )
+          const text = bytes.toString('utf8')
+          return extractPayload(text) ? text : null
+        } catch (err) {
+          ctx.logger.debug('Attached paste unreadable:', describeError(err))
+          return null
+        }
+      })()
+    )
+  return pastes.get(message)
 }
 
 export async function handleBotCommand(interaction, { logger }) {
@@ -69,8 +138,8 @@ export async function handleBotCommand(interaction, { logger }) {
   }
 }
 
-export async function handleDM(message, ctx = {}) {
-  const content = message.content.trim()
+export async function handleDM(message, ctx = {}, text = message.content) {
+  const content = text.trim()
 
   if (content.toLowerCase() === 'done') {
     await message.reply(
@@ -79,24 +148,27 @@ export async function handleDM(message, ctx = {}) {
     return
   }
 
-  let rawPayload = content
-  const fenceMatch = rawPayload.match(
-    /^```(?:json|yaml|yml)?\s*([\s\S]*?)```$/i
-  )
-  if (fenceMatch) {
-    rawPayload = fenceMatch[1].trim()
-  }
-
-  let parsed
-  try {
-    parsed = parseMaintainerrPayload(rawPayload)
-  } catch {
-    await message.reply(
-      "I couldn't parse that payload.\n\n" +
-        "Paste the output copied directly from Maintainerr's Test Media panel, or use `/maintainerr bot` in a server if you want the instructions again. " +
-        'I accept either the raw copy-button output or JSON in a code block.'
+  // Anything that is not a recognisable paste keeps the original parse, so its
+  // error replies read exactly as before.
+  let parsed = extractPayload(content)
+  if (!parsed) {
+    let rawPayload = content
+    const fenceMatch = rawPayload.match(
+      /^```(?:json|yaml|yml)?\s*([\s\S]*?)```$/i
     )
-    return
+    if (fenceMatch) {
+      rawPayload = fenceMatch[1].trim()
+    }
+    try {
+      parsed = parseMaintainerrPayload(rawPayload)
+    } catch {
+      await message.reply(
+        "I couldn't parse that payload.\n\n" +
+          "Paste the output copied directly from Maintainerr's Test Media panel, or use `/maintainerr bot` in a server if you want the instructions again. " +
+          'I accept either the raw copy-button output or JSON in a code block.'
+      )
+      return
+    }
   }
 
   let formatted
@@ -165,27 +237,14 @@ async function sendGuidance(parsed, channel, ctx) {
   if (text) await channel.send(safeMessage(text.slice(0, 1950)))
 }
 
-export function isTestMediaText(content) {
-  try {
-    const raw = content
-      .trim()
-      .replace(/^```(?:json|yaml|yml)?\s*([\s\S]*?)```$/i, '$1')
-    const parsed = parseMaintainerrPayload(raw)
-    return (
-      payloadItems(parsed).some((item) =>
-        Array.isArray(item?.sectionResults)
-      ) ||
-      (parsed?.code === 1 &&
-        Array.isArray(parsed.result) &&
-        !parsed.result.length)
-    )
-  } catch {
-    return false
-  }
-}
+export const isTestMediaText = (content) => extractPayload(content) !== null
 
-export async function handleChannelMessage(message, ctx) {
-  if (!isTestMediaText(message.content)) return false
+export async function handleChannelMessage(
+  message,
+  ctx,
+  text = message.content
+) {
+  if (!isTestMediaText(text)) return false
   const thread = message.channel.isThread()
     ? message.channel
     : await message.startThread({
@@ -194,7 +253,7 @@ export async function handleChannelMessage(message, ctx) {
       })
   await handleDM(
     {
-      content: message.content,
+      content: text,
       channel: thread,
       reply: (text) => thread.send(safeMessage(text)),
     },
