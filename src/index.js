@@ -1,10 +1,10 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js'
 import { config as loadEnv } from 'dotenv'
-import { createContext } from './runtime.js'
 import { readConfig } from './config.js'
 import capabilities from './capabilities/index.js'
 import { createCommandRegistry } from './commands/index.js'
 import { createLogger, describeError } from './lib/logging.js'
+import { createContext } from './runtime.js'
 
 loadEnv({ quiet: true })
 const { config, errors } = readConfig()
@@ -17,7 +17,12 @@ if (errors.length) {
 
 const logger = createLogger(config.logLevel)
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
   partials: [Partials.Channel, Partials.Message],
 })
 let ctx
@@ -33,12 +38,17 @@ try {
 const enabledCapabilities = capabilities.filter((capability) =>
   capability.enabled(config)
 )
-const commands = createCommandRegistry(enabledCapabilities, ctx)
+const commands = createCommandRegistry(enabledCapabilities, ctx, capabilities)
 
-for (const capability of enabledCapabilities) {
-  capability.register(client, ctx)
-  logger.debug(`Enabled capability: ${capability.name}.`)
+for (const capability of capabilities) {
+  if (enabledCapabilities.includes(capability)) capability.register(client, ctx)
+  logger.debug(
+    `${enabledCapabilities.includes(capability) ? 'Enabled' : 'Disabled'} capability: ${capability.name}.`
+  )
 }
+logger.debug(
+  `${config.featureScreenshots ? 'Enabled' : 'Disabled'} capability: screenshots.`
+)
 
 client.once('clientReady', async () => {
   logger.debug(`Logged in as ${client.user.tag}`)
@@ -54,7 +64,7 @@ process.on('unhandledRejection', (err) =>
 
 // Signals can race while the gateway connection is closing.
 let shuttingDown = false
-async function shutdown(signal) {
+async function shutdown(signal, code = 0) {
   if (shuttingDown) return
   shuttingDown = true
   logger.debug(`Received ${signal}, closing the Discord connection.`)
@@ -67,10 +77,22 @@ async function shutdown(signal) {
       describeError(err)
     )
   }
-  for (const cleanup of ctx.cleanup.toReversed()) await cleanup()
-  process.exit(0)
+  for (const cleanup of ctx.cleanup.toReversed()) {
+    try {
+      await cleanup()
+    } catch (err) {
+      logger.error('Error while closing bot services:', describeError(err))
+    }
+  }
+  process.exit(code)
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
-client.login(config.discordToken)
+client.login(config.discordToken).catch((err) => {
+  logger.error(
+    'Discord login failed. Check the token and privileged intents:',
+    describeError(err)
+  )
+  return shutdown('login failure', 1)
+})

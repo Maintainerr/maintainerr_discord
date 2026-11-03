@@ -1,7 +1,7 @@
-import { redactTokens } from './redaction.js'
+import { redactSecrets } from './redaction.js'
 
 export function describeError(err, depth = 0) {
-  if (typeof err === 'string') return redactTokens(err)
+  if (typeof err === 'string') return redactSecrets(err)
   if (!err || typeof err !== 'object') return err
   if (depth > 3) return '[cause chain truncated]'
 
@@ -9,14 +9,16 @@ export function describeError(err, depth = 0) {
   const described = {
     name: err.name,
     message:
-      typeof err.message === 'string' ? redactTokens(err.message) : err.message,
+      typeof err.message === 'string'
+        ? redactSecrets(err.message)
+        : err.message,
     code: err.code,
     status: err.status,
     method: err.method,
-    stack: typeof err.stack === 'string' ? redactTokens(err.stack) : undefined,
+    stack: typeof err.stack === 'string' ? redactSecrets(err.stack) : undefined,
   }
 
-  if ('url' in err) described.url = redactTokens(err.url)
+  if ('url' in err) described.url = redactSecrets(err.url)
   if (err.cause) described.cause = describeError(err.cause, depth + 1)
 
   return described
@@ -34,7 +36,7 @@ export function createLogger(level = 'debug', output = console) {
         output[method](
           ...args.map((value) => {
             if (value instanceof Error) return describeError(value)
-            return typeof value === 'string' ? redactTokens(value) : value
+            return typeof value === 'string' ? redactSecrets(value) : value
           })
         )
       },

@@ -21,10 +21,9 @@ jobs:
         with:
           node-version: 26
 
-      # No install step: the tests use node:test from the standard library and
-      # the modules under test import nothing outside src/, so there is no
-      # dependency tree to resolve.
-      # npm rather than yarn: npm ships with Node, and nothing is being
-      # installed here, so there is no reason to depend on yarn being present.
+      # Decoder parity exercises the existing Discord and YAML dependencies.
+      - name: Install dependencies
+        run: npx --yes yarn@1.22.22 install --frozen-lockfile --ignore-scripts
+
       - name: Run tests
         run: npm test
