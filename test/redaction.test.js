@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { parse } from 'dotenv'
 import { redactSecrets, redactObject } from '../src/lib/redaction.js'
 
 const envSecrets = {
@@ -53,6 +54,52 @@ test('bare secrets, prefixed secrets, compose assignments and Token authorizatio
     assert.ok(output.startsWith('before '), assignment)
     assert.ok(output.endsWith(' after'), assignment)
   }
+})
+
+test('environment values redact completely while log context and URL parameters survive', () => {
+  for (const secret of [
+    'fakeStart;fakeRemainder',
+    'fakeOne,fakeTwo',
+    'fake one two',
+    'fakeOne&fakeRemainder',
+    'fakeOne\"fakeTwo\'fakeThree<>}]',
+  ]) {
+    assert.equal(
+      parse(`QBITTORRENT_PASSWORD=${secret}`).QBITTORRENT_PASSWORD,
+      secret
+    )
+    for (const [prefix, separator] of [
+      ['', '='],
+      ['export ', '='],
+      ['  - ', '='],
+      ['  ', ': '],
+    ]) {
+      const output = redactSecrets(
+        `before\n${prefix}QBITTORRENT_PASSWORD${separator}${secret}\nafter`
+      )
+      assert.equal(
+        output,
+        `before\n${prefix}QBITTORRENT_PASSWORD${separator}[redacted]\nafter`
+      )
+      assert.equal(redactSecrets(output), output)
+    }
+  }
+  assert.equal(
+    redactSecrets('https://plex.local/l?X-Plex-Token=fakeTok,tail;rest&page=2'),
+    'https://plex.local/l?X-Plex-Token=[redacted]&page=2'
+  )
+  assert.equal(
+    redactSecrets('log api_key=fakeToken, status=ok'),
+    'log api_key=[redacted], status=ok'
+  )
+  assert.equal(
+    redactSecrets('I set PASSWORD=fakeStart;fakeRemainder in my env'),
+    'I set PASSWORD=[redacted] in my env'
+  )
+  assert.equal(
+    redactSecrets('API_KEY=`fakeStart\nfakeEnd`\nPORT=1234'),
+    'API_KEY=`[redacted]`\nPORT=1234'
+  )
 })
 
 test('structured and repeatedly escaped JSON use the same prefixed-key policy', () => {

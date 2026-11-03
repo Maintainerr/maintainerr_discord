@@ -24,12 +24,29 @@ test('the four known missing-value cases get deterministic fixes without a model
 })
 
 test('a deliberate existence check and a valid comparison do not get missing-value hints', () => {
-  assert.deepEqual(
-    suggestFixes(
-      payload([
-        section([rule(), rule({ action: 'not_exists', firstValue: null })]),
-      ])
-    ),
-    []
-  )
+  for (const firstValueName of [
+    'Plex title',
+    'sw_lastWatched',
+    'Radarr - Added date',
+    'Sonarr - Added date',
+  ])
+    for (const action of ['exists', 'not_exists'])
+      for (const firstValue of [undefined, null, '', []])
+        assert.deepEqual(
+          suggestFixes(
+            payload([
+              section([
+                rule(),
+                rule({
+                  firstValueName,
+                  action,
+                  firstValue,
+                  result: action === 'not_exists',
+                }),
+              ]),
+            ])
+          ),
+          [],
+          `${firstValueName}: ${action}`
+        )
 })

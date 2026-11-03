@@ -231,10 +231,9 @@ export function createReportDiscord(client, ctx) {
   }
   async function triage(report, thread) {
     if (report.state !== 'triage') return
-    await ctx.relay.sendOnce(
-      thread.id,
-      `triage:${report.id}`,
-      await ctx.answer(JSON.parse(report.fields).happened)
+    // Restoring an existing answer must not spend model quota again.
+    await ctx.relay.sendOnce(thread.id, `triage:${report.id}`, () =>
+      ctx.answer(JSON.parse(report.fields).happened)
     )
   }
 

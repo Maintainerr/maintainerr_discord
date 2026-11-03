@@ -5,7 +5,7 @@ import { chunkText } from '../lib/chunking.js'
 export function createDiscordRelay(client, ctx) {
   const locks = new Map()
   const relay = {
-    async sendOnce(threadId, id, content) {
+    async sendOnce(threadId, id, content, roles = []) {
       const key = `${threadId}:${id}`
       if (locks.has(key)) return locks.get(key)
       const work = (async () => {
@@ -31,7 +31,8 @@ export function createDiscordRelay(client, ctx) {
           if (messages.size < 100) break
           before = messages.last().id
         }
-        return (await thread.send(safeMessage(`${content}\n${marker}`))).id
+        const body = typeof content === 'function' ? await content() : content
+        return (await thread.send(safeMessage(`${body}\n${marker}`, roles))).id
       })()
       locks.set(key, work)
       try {
@@ -79,15 +80,17 @@ export function createDiscordRelay(client, ctx) {
       const content =
         `<@&${ctx.config.staffRoleId}> Report ${report.id}: ${job.kind} stopped after ${job.attempts} attempts. ` +
         'Check the report and service permissions before retrying manually.'
+      const staff = ctx.config.staffRoleId ? [ctx.config.staffRoleId] : []
       const fallback = () =>
         relay.sendOnce(
           ctx.config.launcherChannelId,
           id,
-          `${content}\nThe report thread is deleted or inaccessible: https://discord.com/channels/${report.guild_id}/${report.thread_id}`
+          `${content}\nThe report thread is deleted or inaccessible: https://discord.com/channels/${report.guild_id}/${report.thread_id}`,
+          staff
         )
       if (ctx.store.getCursor(key)?.cursor === 'launcher') return fallback()
       try {
-        return await relay.sendOnce(report.thread_id, id, content)
+        return await relay.sendOnce(report.thread_id, id, content, staff)
       } catch (err) {
         if (err.code !== 10003 && err.code !== 50001 && err.code !== 50013)
           throw err

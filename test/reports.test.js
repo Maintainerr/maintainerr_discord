@@ -3,8 +3,12 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { ChannelType, Collection } from 'discord.js'
 import { openDatabase } from '../src/db.js'
 import { createReportService } from '../src/capabilities/reports/service.js'
+import { createReportDiscord } from '../src/capabilities/reports/discord.js'
+import { createDiscordRelay } from '../src/github/discord-relay.js'
+import { createProvider } from '../src/llm/provider.js'
 import { redactSecrets } from '../src/lib/redaction.js'
 import {
   classifyAttachment,
@@ -54,10 +58,11 @@ test('redaction covers each support ecosystem and preserves surrounding text', (
     ['"X-Plex-Token": "nestedPlex123"', 'nestedPlex123'],
   ]
   for (const [input, secret] of cases) {
-    const result = redactSecrets(`before ${input} after`)
+    // Unquoted values run to end of line, so context sits on its own lines.
+    const result = redactSecrets(`before\n${input}\nafter`)
     assert.ok(!result.includes(secret), input)
-    assert.ok(result.startsWith('before '), input)
-    assert.ok(result.endsWith(' after'), input)
+    assert.ok(result.startsWith('before\n'), input)
+    assert.ok(result.endsWith('\nafter'), input)
   }
 })
 
@@ -167,6 +172,90 @@ test('resolved triage never queues an issue and unresolved triage collects files
     reports.triage(another.id, 'fake-user', false).state,
     'collecting'
   )
+})
+
+test('triage restoration and concurrent delivery spend quota and post an answer only once', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const config = {
+    featureTriage: true,
+    forumChannelId: 'forum',
+    launcherChannelId: 'launcher',
+  }
+  const reports = createReportService(store, config)
+  const report = reports.create({ ...reportInput(0), category: 'question' })
+  reports.attachThread(report.id, 'thread', 'control')
+  const messages = new Collection()
+  const client = {
+    user: { id: 'bot' },
+    channels: { fetch: async (id) => channels.get(id) },
+  }
+  const launcher = {
+    id: 'launch-message',
+    author: client.user,
+    components: [{ components: [{ customId: 'report:start' }] }],
+    edit: async () => launcher,
+  }
+  store.setCursor('reports:launcher', launcher.id)
+  const channels = new Map([
+    ['forum', { type: ChannelType.GuildForum, guildId: 'fake-guild' }],
+    [
+      'launcher',
+      {
+        guildId: 'fake-guild',
+        isTextBased: () => true,
+        messages: { fetch: async () => launcher },
+      },
+    ],
+    [
+      'thread',
+      {
+        id: 'thread',
+        members: { add: async () => {} },
+        messages: { fetch: async () => messages, edit: async () => {} },
+        send: async (message) => {
+          const sent = {
+            ...message,
+            id: `answer-${messages.size}`,
+            author: client.user,
+          }
+          messages.set(sent.id, sent)
+          return sent
+        },
+      },
+    ],
+  ])
+  let calls = 0
+  const provider = createProvider(
+    { llmBaseUrl: 'http://local.test', llmModel: 'fake', llmDailyLimit: 5 },
+    store,
+    {
+      now: () => 0,
+      queue: { run: (fn) => fn() },
+      fetchFn: async () => {
+        calls += 1
+        return Response.json({
+          choices: [{ message: { content: 'Documented advice.' } }],
+        })
+      },
+    }
+  )
+  const ctx = {
+    config,
+    store,
+    logger: { debug() {} },
+    answer: (question) =>
+      provider.complete({ system: 'Use docs only', user: question }),
+  }
+  ctx.relay = createDiscordRelay(client, ctx)
+  const first = createReportDiscord(client, ctx)
+  await Promise.all([first.ready(), first.ready()])
+  ctx.relay = createDiscordRelay(client, ctx)
+  await createReportDiscord(client, ctx).ready()
+  assert.equal(messages.size, 1)
+  assert.equal(calls, 1)
+  assert.equal(JSON.parse(store.getCursor('llm:daily').cursor).used, 1)
+  assert.equal(reports.get(report.id).state, 'triage')
 })
 
 test('attachment allowlist rejects size, executables and disguised binary files', async () => {

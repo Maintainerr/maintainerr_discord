@@ -1,7 +1,9 @@
 # Logs
 logs
 *.log
-!/AUDIT.log
+
+# Maintainer planning and audit notes are kept local, not published.
+/PLAN.md
 data/
 *.sqlite
 *.sqlite-wal
@@ -43,7 +45,8 @@ bower_components
 build/Release
 
 # Dependency directories
-node_modules/
+# No trailing slash: that form does not match a node_modules symlink.
+node_modules
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)

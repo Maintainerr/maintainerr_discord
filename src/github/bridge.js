@@ -35,6 +35,50 @@ export function issueBody(report, attachments) {
 
 export function createBridge({ store, github, relay, logger, now = Date.now }) {
   const { db } = store
+  // Our own bot user id, learned from the first issue or comment we write, so a
+  // different app on the repository cannot claim one of our markers.
+  let botId
+  const bot = () => {
+    if (botId === undefined)
+      botId = Number(store.getCursor('github:bot')?.cursor) || null
+    return botId
+  }
+  // Repository-relative history cannot safely be reassigned to a different target.
+  let mismatchLogged = false
+  const repositoryChanged = () => {
+    const root = github.root.toLowerCase()
+    const stored = store.transaction(() => {
+      const previous = store.getCursor('github:repository')?.cursor
+      if (previous) return previous.toLowerCase()
+      const history = db
+        .prepare(
+          `SELECT
+        EXISTS(SELECT 1 FROM reports WHERE issue_number IS NOT NULL) OR
+        EXISTS(SELECT 1 FROM jobs WHERE kind IN ('publish', 'comment') AND attempts > 0) OR
+        EXISTS(SELECT 1 FROM sync) OR
+        EXISTS(SELECT 1 FROM poll_cursor WHERE key LIKE 'github:%') AS found`
+        )
+        .get().found
+      if (history) return null
+      store.setCursor('github:repository', root, null, now())
+      return root
+    })
+    if (stored === root) return false
+    if (!mismatchLogged) {
+      mismatchLogged = true
+      logger.warn(
+        `GitHub sync is disabled: stored history belongs to ${stored ?? 'an unknown repository'}, not ${github.root}. ` +
+          'Restore the original repository binding or use a fresh database.'
+      )
+    }
+    return true
+  }
+
+  const rememberBot = (item) => {
+    if (bot() || item?.user?.type !== 'Bot' || !item.user.id) return
+    botId = item.user.id
+    store.setCursor('github:bot', String(botId), null, now())
+  }
   let timer
   let active
   let nextPoll = 0
@@ -55,6 +99,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
 
   const bridge = {
     async publish(reportId) {
+      if (repositoryChanged()) return
       let report = get(reportId)
       if (!report || !['publishing', 'published'].includes(report.state)) return
       let issue
@@ -71,7 +116,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           `${github.root}/issues?state=all&labels=source%3Adiscord&per_page=100`
         )
         issue = existing.find(
-          (item) => !item.pull_request && ownsMarker(item, marker)
+          (item) => !item.pull_request && ownsMarker(item, marker, bot())
         )
         if (!issue) {
           if (!labelsReady) {
@@ -91,6 +136,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
             })
           ).data
         }
+        rememberBot(issue)
         db.prepare(
           "UPDATE reports SET state = 'published', issue_number = ?, updated_at = ? WHERE id = ?"
         ).run(issue.number, now(), report.id)
@@ -99,6 +145,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       await relay.published(report, issue)
     },
     async relayReply(payload) {
+      if (repositoryChanged()) return
       const report = get(payload.reportId)
       if (
         !report?.issue_number ||
@@ -110,7 +157,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       const comments = await github.list(
         `${github.root}/issues/${report.issue_number}/comments?per_page=100`
       )
-      let comment = comments.find((item) => ownsMarker(item, marker))
+      let comment = comments.find((item) => ownsMarker(item, marker, bot()))
       if (!comment) {
         await github.request(
           'PATCH',
@@ -127,9 +174,11 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           )
         ).data
       }
+      rememberBot(comment)
       record('discord-github', payload.messageId, report.id, comment.id)
     },
     async poll() {
+      if (repositoryChanged()) return
       const cursor = store.getCursor('github:issues')
       const since = cursor?.cursor || new Date(now() - 60000).toISOString()
       const path = `${github.root}/issues?state=all&sort=updated&direction=asc&per_page=100&since=${encodeURIComponent(since)}`
@@ -139,6 +188,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       if (response.status === 304) return
       const issues = [...response.data]
       if (response.next) issues.push(...(await github.list(response.next)))
+      let retry = false
       for (const issue of issues) {
         const report = db
           .prepare('SELECT * FROM reports WHERE issue_number = ?')
@@ -153,12 +203,12 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           await relay.issueState(report, issue)
         } catch (err) {
           if (![10003, 50001, 50013].includes(err.code)) throw err
-          if (err.code === 10003)
+          if (err.code === 10003) {
             store.setCursor(
               `discord:deleted-thread:${report.thread_id}`,
               'true'
             )
-          // One unavailable thread must not stop synchronization of other reports.
+          } else retry = true
           continue
         }
         const previous = store.getCursor(`github:comments:${issue.number}`)
@@ -201,16 +251,18 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
         since
       )
       const advanced =
-        issues.length >= 100 && watermark > since
+        !retry && issues.length >= 100 && watermark > since
           ? new Date(Date.parse(watermark) - 1000).toISOString()
           : since
+      // A 304 would hide undelivered updates even after Discord access recovers.
       store.setCursor(
         'github:issues',
         advanced,
-        advanced === since ? response.etag : null
+        !retry && advanced === since ? response.etag : null
       )
     },
     async runJobs() {
+      if (repositoryChanged()) return
       for (const job of store.claimBatch({ limit: 3, now: now() })) {
         try {
           if (job.kind === 'publish') await bridge.publish(job.payload.reportId)

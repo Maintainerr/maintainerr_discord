@@ -6,6 +6,7 @@ import { createReportService } from '../src/capabilities/reports/service.js'
 import { appJwt, createGitHub } from '../src/github/client.js'
 import { createBridge } from '../src/github/bridge.js'
 import { createDiscordRelay } from '../src/github/discord-relay.js'
+import { retryAfterMs } from '../src/lib/http.js'
 import {
   reportMarker,
   commentMarker,
@@ -253,6 +254,35 @@ test('user text cannot impersonate a bot-owned idempotency marker', () => {
     ownsMarker({ user: { type: 'Bot' }, body: `${marker}\nreport` }, marker),
     true
   )
+  // Once our own bot id is known, another app's bot cannot claim the marker.
+  assert.equal(
+    ownsMarker(
+      { user: { type: 'Bot', id: 7 }, body: `${marker}\nx` },
+      marker,
+      7
+    ),
+    true
+  )
+  assert.equal(
+    ownsMarker(
+      { user: { type: 'Bot', id: 9 }, body: `${marker}\nx` },
+      marker,
+      7
+    ),
+    false
+  )
+})
+
+test('Retry-After is read the same way for every client', () => {
+  const now = 1000000
+  const at = (value) =>
+    retryAfterMs(new Headers(value ? { 'retry-after': value } : {}), now)
+  assert.equal(at('5'), 5000)
+  assert.equal(at('0'), 0, 'retry immediately is not the same as absent')
+  assert.equal(at(new Date(now + 30000).toUTCString()), 30000)
+  assert.equal(at(new Date(now - 30000).toUTCString()), 0, 'past dates clamp')
+  assert.equal(at('soon'), null)
+  assert.equal(at(null), null)
 })
 
 test('unchanged poll makes one conditional request and closing and replying change both states', async (t) => {
@@ -370,7 +400,12 @@ test('a deleted report thread exhausts the job once and staff receive exactly on
   assert.match(notices[0].content, /<@&fake-staff>/)
   assert.ok(notices[0].content.includes(env.report.id))
   assert.match(notices[0].content, /thread is deleted or inaccessible/)
-  assert.deepEqual(notices[0].allowedMentions, { parse: [] })
+  // The alert exists to reach a human, so the staff role must be allowed
+  // through; parse stays empty so nothing else, including everyone, can ping.
+  assert.deepEqual(notices[0].allowedMentions, {
+    parse: [],
+    roles: ['fake-staff'],
+  })
   const restarted = bridge()
   for (let tick = 0; tick < 3; tick += 1) await restarted.runJobs()
   await restarted.poll()
@@ -443,11 +478,20 @@ test('a failure notice keeps its launcher destination across permission recovery
       1,
       `Duplicate notice after permission recovery: ${code}`
     )
+    // A healthy thread is the common destination, so it must ping staff too.
+    await createDiscordRelay(client, ctx).failed(report, { ...job, id: 2 })
+    assert.equal(sent[1].channelId, 'fake-thread')
+    assert.deepEqual(sent[1].allowedMentions, {
+      parse: [],
+      roles: ['fake-staff'],
+    })
   }
 })
 
 test('an unavailable Discord thread does not block polling other reports', async (t) => {
-  for (const code of [10003, 50001, 50013]) {
+  for (const [code, size] of [10003, 50001, 50013].flatMap((code) =>
+    [2, 100].map((size) => [code, size])
+  )) {
     const env = setup(t)
     const other = env.reports.create({
       guildId: 'scratch-guild',
@@ -459,19 +503,154 @@ test('an unavailable Discord thread does not block polling other reports', async
     env.reports.attachThread(other.id, 'other-thread', 'other-control')
     env.reports.finish(other.id, 'another-user')
     for (const id of [env.report.id, other.id])
-      env.reports.requestPublish(id, { staff: true, guildId: 'scratch-guild' })
+      env.reports.requestPublish(id, {
+        staff: true,
+        guildId: 'scratch-guild',
+      })
     const bridge = env.bridge()
     await bridge.runJobs()
+    env.store.setCursor('github:issues', '2026-11-02T11:59:00.000Z')
+    env.issues[1].updated_at = '2026-11-02T12:05:00Z'
+    for (let number = 3; number <= size; number += 1)
+      env.issues.push({ number, updated_at: '2026-11-02T12:10:00Z' })
+    env.github.request = async (method, path, body, options) => {
+      if (options?.etag === 'unchanged') return { status: 304 }
+      const since = new URL(`https://api.example.test${path}`).searchParams.get(
+        'since'
+      )
+      return {
+        status: 200,
+        etag: 'unchanged',
+        data: env.issues.filter(
+          (issue) => Date.parse(issue.updated_at) > Date.parse(since)
+        ),
+      }
+    }
+    const comment = {
+      id: 123,
+      body: 'Recovered reply',
+      user: { type: 'User', login: 'reporter' },
+      created_at: '2026-11-02T12:00:01Z',
+    }
+    env.github.list = async (path) =>
+      path.includes('/issues/1/comments') ? [comment] : []
+    let inaccessible = true
     const states = []
     env.relay.issueState = async (report, issue) => {
-      if (report.id === env.report.id)
+      if (report.id === env.report.id && inaccessible)
         throw Object.assign(new Error('Thread unavailable'), { code })
-      states.push(issue.state)
+      states.push([report.id, issue.state])
     }
     env.issues[1].state = 'closed'
     await bridge.poll()
-    assert.deepEqual(states, ['closed'])
-    if (code === 10003)
+    assert.deepEqual(states, [[other.id, 'closed']])
+    if (code === 10003) {
       assert.ok(env.store.getCursor('discord:deleted-thread:fake-thread'))
+      if (size === 100)
+        assert.ok(
+          env.store.getCursor('github:issues').cursor > env.issues[0].updated_at
+        )
+      continue
+    }
+    assert.equal(env.store.getCursor('github:issues').etag, null)
+    await env.bridge().poll()
+    inaccessible = false
+    await env.bridge().poll()
+    assert.equal(states.filter(([id]) => id === env.report.id).length, 1)
+    assert.deepEqual(
+      env.relayed.filter(([kind]) => kind === 'comment'),
+      [['comment', 123]]
+    )
+    await env.bridge().poll()
+    assert.equal(env.relayed.filter(([kind]) => kind === 'comment').length, 1)
+  }
+})
+
+test('a changed repository stops the bridge reusing stored issue numbers', async (t) => {
+  const env = setup(t)
+  env.reports.requestPublish(env.report.id, {
+    staff: true,
+    guildId: 'scratch-guild',
+  })
+  await env.bridge().runJobs()
+  assert.equal(env.issues.length, 1)
+  const jobId = env.store.enqueue(
+    'comment',
+    {
+      reportId: env.report.id,
+      messageId: 10,
+      author: 'reporter',
+      body: 'Queued reply',
+    },
+    { dedupeKey: 'queued-reply', now: 0 }
+  )
+  const before = env.requests.length
+
+  // Same /data, different GITHUB_REPOSITORY: issue 1 here is a different issue.
+  env.github.root = '/repos/Example/production'
+  const warnings = []
+  const moved = createBridge({
+    store: env.store,
+    github: env.github,
+    relay: env.relay,
+    logger: { debug() {}, warn: (message) => warnings.push(message) },
+  })
+  await moved.poll()
+  await moved.runJobs()
+  await moved.publish(env.report.id)
+  await moved.relayReply({ reportId: env.report.id, messageId: 9, body: 'x' })
+
+  assert.equal(
+    env.requests.length,
+    before,
+    'the bridge must not touch the new repository with stored mappings'
+  )
+  assert.equal(warnings.length, 1)
+  assert.equal(
+    env.store.db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId)
+      .status,
+    'pending'
+  )
+  env.github.root = '/repos/example/SCRATCH'
+  await moved.runJobs()
+  assert.equal(env.comments.length, 1)
+  assert.equal(
+    env.store.db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId)
+      .status,
+    'completed'
+  )
+})
+
+test('unbound GitHub history is not silently assigned to a configured repository', async (t) => {
+  for (const history of ['issue', 'attempt', 'sync', 'cursor']) {
+    const env = setup(t)
+    if (history === 'issue')
+      env.store.db
+        .prepare(
+          "UPDATE reports SET state = 'published', issue_number = 7 WHERE id = ?"
+        )
+        .run(env.report.id)
+    else if (history === 'attempt') {
+      env.reports.requestPublish(env.report.id, {
+        staff: true,
+        guildId: 'scratch-guild',
+      })
+      env.store.claimBatch({ now: Date.now() + 60000 })
+    } else if (history === 'sync')
+      env.store.db
+        .prepare('INSERT INTO sync VALUES (?, ?, ?, ?, ?)')
+        .run('discord-github', '1', env.report.id, '7', 0)
+    else env.store.setCursor('github:issues', '2026-11-02T00:00:00Z')
+    const bridge = env.bridge()
+    await bridge.poll()
+    await bridge.runJobs()
+    await bridge.publish(env.report.id)
+    await bridge.relayReply({
+      reportId: env.report.id,
+      messageId: 9,
+      body: 'A reply',
+    })
+    assert.equal(env.requests.length, 0, history)
+    assert.equal(env.store.getCursor('github:repository'), undefined)
   }
 })

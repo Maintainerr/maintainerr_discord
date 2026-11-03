@@ -1,3 +1,4 @@
+import { retryAfterMs } from '../lib/http.js'
 import { createPrivateKey, sign } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -92,12 +93,10 @@ export function createGitHub(
           }
         if (!response.ok) {
           if (response.status === 401) cached = null
-          const retryAfter = response.headers.get('retry-after')
-          const seconds = Number(retryAfter)
+          const after = retryAfterMs(response.headers, now())
           const reset = Number(response.headers.get('x-ratelimit-reset')) * 1000
-          const retryAt = seconds
-            ? now() + seconds * 1000
-            : Date.parse(retryAfter) || reset || now() + 60000
+          const retryAt =
+            after === null ? reset || now() + 60000 : now() + after
           await response.body?.cancel()
           throw new GitHubError(response.status, retryAt)
         }

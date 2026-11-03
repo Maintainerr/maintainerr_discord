@@ -18,9 +18,9 @@ export function suggestFixes(payload) {
   for (const item of payloadItems(payload)) {
     for (const section of item.sectionResults ?? []) {
       for (const rule of section.ruleResults ?? []) {
+        if (UNARY_ACTIONS.has(rule.action)) continue
         const firstMissing = missing(rule.firstValue)
-        const secondMissing =
-          !UNARY_ACTIONS.has(rule.action) && missing(rule.secondValue)
+        const secondMissing = missing(rule.secondValue)
         if (
           firstMissing &&
           String(rule.firstValueName ?? '')
@@ -51,10 +51,7 @@ export function suggestFixes(payload) {
           fixes.add(
             'This date rule has no date to compare. Check whether the source supplies that date, and handle missing dates with an exists or not_exists rule.'
           )
-        } else if (
-          (firstMissing || secondMissing) &&
-          !UNARY_ACTIONS.has(rule.action)
-        ) {
+        } else if (firstMissing || secondMissing) {
           fixes.add(
             'A comparison operand is missing. Check the source field and use an exists or not_exists rule to handle missing values explicitly.'
           )

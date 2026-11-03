@@ -1,9 +1,10 @@
 name: pr-check
 
+# Every pull request, not only those targeting main: phase work is reviewed as
+# a stack of chained branches, and filtering to main skipped the image build on
+# all but the first one.
 on:
   pull_request:
-    branches:
-      - main
 
 jobs:
   build:

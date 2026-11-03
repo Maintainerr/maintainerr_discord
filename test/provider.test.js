@@ -41,6 +41,7 @@ test('429 is retried and outgoing prompts are redacted', async (t) => {
     { llmBaseUrl: 'http://local.test/v1', llmModel: 'fake', llmDailyLimit: 5 },
     store,
     {
+      now: () => 0,
       queue: { run: (fn) => fn() },
       wait: async (delay) => waits.push(delay),
       fetchFn: async (url, options) => {
@@ -131,10 +132,102 @@ test('provider requests never contain env-style credentials from pasted configur
   )
   await provider.complete({
     system: 'Use docs only',
-    user: 'PLEX_TOKEN=fakePlex111\nRADARR_API_KEY=fakeRadarr333\nclient_secret: fakeClient444\nAuthorization: Token fakeAuth555',
+    user: 'PLEX_TOKEN=fakePlex111\nRADARR_API_KEY=fakeRadarr333\nclient_secret: fakeClient444\nAuthorization: Token fakeAuth555\nQBITTORRENT_PASSWORD=fakeStart;fakeTail&fakeRest',
   })
   assert.doesNotMatch(
     outgoing,
-    /fakePlex111|fakeRadarr333|fakeClient444|fakeAuth555/
+    /fakePlex111|fakeRadarr333|fakeClient444|fakeAuth555|fakeStart|fakeTail|fakeRest/
   )
+})
+
+test('a 429 holds every queued request without extending the declared cooldown', async (t) => {
+  let clock = 0
+  const queue = new RequestQueue({
+    rpm: 60,
+    now: () => clock,
+    wait: async (delay) => {
+      clock += delay
+    },
+  })
+  const sent = []
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const provider = createProvider(
+    { llmBaseUrl: 'http://local.test/v1', llmModel: 'fake', llmDailyLimit: 99 },
+    store,
+    {
+      queue,
+      now: () => clock,
+      wait: async () => {},
+      fetchFn: async () => {
+        sent.push(clock)
+        return sent.length === 1
+          ? new Response('', { status: 429, headers: { 'retry-after': '10' } })
+          : Response.json({ choices: [{ message: { content: 'ok' } }] })
+      },
+    }
+  )
+  await Promise.all([
+    provider.complete({ system: '', user: 'one' }),
+    provider.complete({ system: '', user: 'two' }),
+  ])
+  assert.deepEqual(sent, [0, 10000, 11000])
+  assert.equal(JSON.parse(store.getCursor('llm:daily').cursor).used, 2)
+})
+
+test('exhausted retries keep the shared cooldown and long waits respect the response deadline', async (t) => {
+  for (const retryAfter of [null, '121']) {
+    const store = openDatabase(':memory:')
+    t.after(() => store.close())
+    let clock = 0
+    const sent = []
+    let limited = true
+    const provider = createProvider(
+      {
+        llmBaseUrl: 'http://local.test',
+        llmModel: 'fake',
+        llmDailyLimit: 5,
+        llmRpm: 60,
+      },
+      store,
+      {
+        now: () => clock,
+        wait: async (delay) => {
+          clock += delay
+        },
+        fetchFn: async () => {
+          sent.push(clock)
+          return limited
+            ? new Response('', {
+                status: 429,
+                headers: retryAfter ? { 'retry-after': retryAfter } : {},
+              })
+            : Response.json({
+                choices: [{ message: { content: 'Recovered' } }],
+              })
+        },
+      }
+    )
+    await assert.rejects(
+      provider.complete({ system: '', user: 'First' }),
+      retryAfter ? /response window/ : /HTTP 429/
+    )
+    limited = false
+    if (retryAfter) {
+      await assert.rejects(
+        provider.complete({ system: '', user: 'Still limited' }),
+        /response window/
+      )
+      assert.deepEqual(sent, [0])
+      clock = 121000
+    }
+    assert.equal(
+      await provider.complete({ system: '', user: 'Recovered' }),
+      'Recovered'
+    )
+    assert.deepEqual(
+      sent,
+      retryAfter ? [0, 121000] : [0, 1000, 3000, 7000, 15000]
+    )
+  }
 })

@@ -27,35 +27,35 @@ Copy `.env.example` to `.env` for local development. Inject secrets at runtime i
 containers. `DISCORD_TOKEN` is the only required variable. Configuration errors
 are reported together and do not print supplied values.
 
-| Variable                      | Default                         | Purpose                                                                                            |
-| ----------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `DISCORD_TOKEN`               | required                        | Discord bot token.                                                                                 |
-| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally.                                               |
-| `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                                                 |
-| `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error`, or `silent`.                                                     |
-| `FEATURE_SMART_DECODER`       | `false`                         | Decode channel pastes in threads, add likely fixes and generated docs links in channels and DMs.   |
-| `FEATURE_SCREENSHOTS`         | `false`                         | Transcribe Test Media screenshots, then run the ordinary formatter.                                |
-| `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                         |
-| `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                         |
-| `FEATURE_TRIAGE`              | `false`                         | Try docs answering for question reports before collecting files. Requires support and reports.     |
-| `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                              |
-| `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                     |
-| `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                    |
-| `DISCORD_SUPPORT_CHANNEL_ID`  | empty                           | Opt into automatic answers in exactly this one channel. Requires support; empty means `/ask` only. |
-| `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                       |
-| `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                               |
-| `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                    |
-| `GITHUB_REPOSITORY`           | `Maintainerr/Maintainerr`       | Issue target as `owner/name`. Use a scratch repository for development.                            |
-| `LLM_BASE_URL`                | empty                           | OpenAI-compatible server URL, optionally ending in `/v1`. Empty means docs links only.             |
-| `LLM_API_KEY`                 | empty                           | Provider key if required. Secret.                                                                  |
-| `LLM_MODEL`                   | empty                           | Model identifier. Required when a provider URL is set.                                             |
-| `LLM_VISION`                  | `false`                         | Explicitly declare that the configured model accepts images.                                       |
-| `LLM_REQUESTS_PER_MINUTE`     | `1`                             | Serial token-bucket rate. Set below the provider's published limit.                                |
-| `LLM_DAILY_LIMIT`             | `100`                           | Maximum logical model requests per UTC day; retries share one unit. Persisted in SQLite.           |
-| `DOCS_REPOSITORY`             | `Maintainerr/Maintainerr_docs`  | Documentation source as `owner/name`.                                                              |
-| `DOCS_REF`                    | `main`                          | Documentation branch, tag, or commit. A refresh pins all files to one tree SHA.                    |
-| `DOCS_ORIGIN`                 | `https://docs.maintainerr.info` | Published docs origin used for citations.                                                          |
-| `ATTACHMENT_MAX_BYTES`        | `1048576`                       | Per-file cap for reports and screenshots. Reports allow at most ten files or pasted logs.          |
+| Variable                      | Default                         | Purpose                                                                                                                             |
+| ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`               | required                        | Discord bot token.                                                                                                                  |
+| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally.                                                                                |
+| `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                                                                                  |
+| `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error`, or `silent`.                                                                                      |
+| `FEATURE_SMART_DECODER`       | `false`                         | Decode channel pastes in threads, add likely fixes and generated docs links in channels and DMs.                                    |
+| `FEATURE_SCREENSHOTS`         | `false`                         | Transcribe Test Media screenshots, then run the ordinary formatter.                                                                 |
+| `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                                                          |
+| `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                                                          |
+| `FEATURE_TRIAGE`              | `false`                         | Try docs answering for question reports before collecting files. Requires support and reports.                                      |
+| `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                               |
+| `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                      |
+| `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                     |
+| `DISCORD_SUPPORT_CHANNEL_ID`  | empty                           | Opt into automatic answers in exactly this one channel. Requires support; empty means `/ask` only.                                  |
+| `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                                                        |
+| `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                                                                |
+| `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                                                     |
+| `GITHUB_REPOSITORY`           | empty                           | Issue target as `owner/name`. Required when `FEATURE_REPORTS` is on; there is no default. Use a scratch repository for development. |
+| `LLM_BASE_URL`                | empty                           | OpenAI-compatible server URL, optionally ending in `/v1`. Empty means docs links only.                                              |
+| `LLM_API_KEY`                 | empty                           | Provider key if required. Secret.                                                                                                   |
+| `LLM_MODEL`                   | empty                           | Model identifier. Required when a provider URL is set.                                                                              |
+| `LLM_VISION`                  | `false`                         | Explicitly declare that the configured model accepts images.                                                                        |
+| `LLM_REQUESTS_PER_MINUTE`     | `1`                             | Serial token-bucket rate. Set below the provider's published limit.                                                                 |
+| `LLM_DAILY_LIMIT`             | `100`                           | Maximum logical model requests per UTC day; retries share one unit. Persisted in SQLite.                                            |
+| `DOCS_REPOSITORY`             | `Maintainerr/Maintainerr_docs`  | Documentation source as `owner/name`.                                                                                               |
+| `DOCS_REF`                    | `main`                          | Documentation branch, tag, or commit. A refresh pins all files to one tree SHA.                                                     |
+| `DOCS_ORIGIN`                 | `https://docs.maintainerr.info` | Published docs origin used for citations.                                                                                           |
+| `ATTACHMENT_MAX_BYTES`        | `1048576`                       | Per-file cap for reports and screenshots. Reports allow at most ten files or pasted logs.                                           |
 
 Boolean flags accept `true`, `false`, `1`, and `0`. All feature flags are off by
 default. With just a token and writable storage, the bot preserves the original
@@ -113,6 +113,10 @@ Files remain in Discord, with the issue linking back to the thread. Human replie
 reopen closed issues and archived threads. Idempotency markers and persisted job
 leases recover interrupted publication and relay operations.
 
+GitHub history is bound to its original repository. Changing the target, or
+finding old history without a binding, disables sync. Keep scratch and production
+databases separate.
+
 `FEATURE_TRIAGE=true` makes question reports try documentation first. A reporter
 can mark the question solved, in which case no issue is queued, or continue into
 file collection. Leave this flag disabled until docs answering has been observed
@@ -122,6 +126,11 @@ Use a free-tier or self-hosted provider; no provider is selected by default.
 Text prompts are redacted and retrieval is limited to three short sections.
 Screenshot pixels cannot be text-redacted, so screenshot reading is separately
 opted into. Quotas and provider failures never disable the deterministic decoder.
+
+Free tiers commonly fall outside the data-handling terms of their paid tiers,
+which can mean prompts are retained and used to improve the provider's models.
+Support questions carry logs and paths, so check the terms of the provider you
+configure. A self-hosted model keeps everything on your own hardware.
 
 ## Running it
 
