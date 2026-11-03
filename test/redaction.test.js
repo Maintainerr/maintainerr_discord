@@ -93,6 +93,10 @@ test('environment values redact completely while log context and URL parameters 
     'log api_key=[redacted], status=ok'
   )
   assert.equal(
+    redactSecrets('I set PASSWORD=fakeStart;fakeRemainder in my env'),
+    'I set PASSWORD=[redacted] in my env'
+  )
+  assert.equal(
     redactSecrets('API_KEY=`fakeStart\nfakeEnd`\nPORT=1234'),
     'API_KEY=`[redacted]`\nPORT=1234'
   )

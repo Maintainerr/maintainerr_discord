@@ -127,9 +127,11 @@ export function redactSecrets(value, depth = 0) {
     ),
     '$1$2[redacted]$2'
   )
+  // Mid-line, a comma or semicolon followed by a space separates log fields;
+  // with no space it is part of the value and must not end the redaction.
   text = text.replace(
     new RegExp(
-      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!\\[redacted\\])([^\\s&"'\x60,;<>}\\]]+)`,
+      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!\\[redacted\\])((?:[^\\s&"'\x60,;<>}\\]]|[,;](?=\\S))+)`,
       'gi'
     ),
     '$1[redacted]'
