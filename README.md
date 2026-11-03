@@ -1,11 +1,8 @@
 # maintainerr_discord
 
-A Discord bot that explains Maintainerr Test Media results.
-
-Maintainerr's Test Media panel tells you whether an item matched a collection's
-rules, but the raw output is a wall of JSON. Paste that output to this bot in a
-DM and it replies with a readable breakdown: what each rule expected, what the
-value actually was, and why the rule passed or failed.
+The Maintainerr Discord bot. It answers support questions from the
+documentation, explains Test Media results, sends bug reports to GitHub and
+welcomes new members.
 
 ## Using it
 
@@ -39,133 +36,86 @@ To get your Test Media output:
 
 The bot accepts the raw copy button output, or JSON or YAML in a code block.
 
-## Configuration
+## Features
 
-Copy `.env.example` to `.env` for local development. Inject secrets at runtime in
-containers. `DISCORD_TOKEN` is the only required variable. Configuration errors
-are reported together and do not print supplied values.
+Every feature is off by default. With only a token, the bot answers `/testmedia`,
+`/help` and `/delete`, and decodes Test Media pastes sent to it in a DM.
 
-| Variable                      | Default                         | Purpose                                                                                                                                         |
-| ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCORD_TOKEN`               | required                        | Discord bot token.                                                                                                                              |
-| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally, and remove the bot's global copies.                                                        |
-| `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                                                                                              |
-| `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error`, or `silent`.                                                                                                  |
-| `FEATURE_SMART_DECODER`       | `false`                         | Decode channel pastes in threads, add likely fixes and generated docs links in channels and DMs.                                                |
-| `FEATURE_SCREENSHOTS`         | `false`                         | Transcribe Test Media screenshots, then run the ordinary formatter.                                                                             |
-| `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                                                                      |
-| `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                                                                      |
-| `FEATURE_WELCOME`             | `false`                         | Greet new members. Needs the privileged Server Members Intent.                                                                                  |
-| `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                                           |
-| `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                                  |
-| `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                                 |
-| `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated channels or forums for channel pastes, screenshots and automatic answers. Empty means DMs and `/ask` only.                      |
-| `DISCORD_SUPPORT_ROLE_ID`     | empty                           | Role pinged once per answer when someone presses This Did Not Help in a support channel. Make it mentionable, or let the bot mention all roles. |
-| `DISCORD_WELCOME_CHANNEL_ID`  | empty                           | Channel for welcome messages. Required with welcome.                                                                                            |
-| `DISCORD_WELCOME_ROLE_ID`     | empty                           | Role every new member gets once they have accepted the server rules. Needs welcome and Manage Roles.                                            |
-| `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                                                                    |
-| `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                                                                            |
-| `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                                                                 |
-| `GITHUB_REPOSITORY`           | empty                           | Issue target as `owner/name`. Required when `FEATURE_REPORTS` is on; there is no default. Use a scratch repository for development.             |
-| `LLM_BASE_URL`                | empty                           | OpenAI-compatible server URL, optionally ending in `/v1`. Empty means docs links only.                                                          |
-| `LLM_API_KEY`                 | empty                           | Provider key if required. Secret.                                                                                                               |
-| `LLM_MODEL`                   | empty                           | Model identifier. Required when a provider URL is set.                                                                                          |
-| `LLM_VISION`                  | `false`                         | Explicitly declare that the configured model accepts images.                                                                                    |
-| `LLM_REQUESTS_PER_MINUTE`     | `1`                             | Serial token-bucket rate. Set below the provider's published limit.                                                                             |
-| `LLM_DAILY_LIMIT`             | `100`                           | Maximum logical model requests per UTC day; retries share one unit. Persisted in SQLite.                                                        |
-| `DOCS_REPOSITORY`             | `Maintainerr/Maintainerr_docs`  | Documentation source as `owner/name`.                                                                                                           |
-| `DOCS_REF`                    | `main`                          | Documentation branch, tag, or commit. A refresh pins all files to one tree SHA.                                                                 |
-| `DOCS_ORIGIN`                 | `https://docs.maintainerr.info` | Published docs origin used for citations.                                                                                                       |
-| `ATTACHMENT_MAX_BYTES`        | `1048576`                       | Per-file cap for reports and screenshots. Reports allow at most ten files or pasted logs.                                                       |
+- **Support** (`FEATURE_SUPPORT`): answers each new post in the support forums
+  once, and `/ask` anywhere, with the three closest documentation sections.
+  "This Did Not Help" thanks the member, offers Report a Bug when reports are on,
+  and pings `DISCORD_SUPPORT_ROLE_ID` once per answer in the support channels.
+- **Smart decoder** (`FEATURE_SMART_DECODER`): decodes Test Media pastes in the
+  support channels, and adds likely fixes and rule documentation links to every
+  breakdown.
+- **Bug reports** (`FEATURE_REPORTS`): a launcher sends feature ideas to the
+  feature board and questions to the support forums. A bug opens a form and a
+  post in the reports forum, where the reporter adds files and presses Done. A
+  member with the staff role publishes it to GitHub. Replies sync both ways,
+  GitHub is checked every 60 seconds, and issue labels show as matching forum
+  tags.
+- **Welcome** (`FEATURE_WELCOME`): greets each new member in the welcome channel
+  and, with `DISCORD_WELCOME_ROLE_ID`, gives them that role once they have
+  accepted the server rules.
+- **Screenshots** (`FEATURE_SCREENSHOTS`): reads Test Media screenshots. Needs a
+  model with `LLM_VISION=true`; without one the bot asks for the copied text.
 
-Boolean flags accept `true`, `false`, `1`, and `0`. All feature flags are off by
-default. With just a token and writable storage, the bot preserves the original
-DM decoder and logs that support, reports and screenshot reading are disabled.
-It fetches documentation only when support or the smart decoder is enabled.
+A model is optional. Without one, answers are documentation links. Free tiers
+may keep prompts to train their models, and support questions contain logs and
+paths, so check the provider's terms or run a model yourself.
 
-The bot needs the `applications.commands` scope and the Guilds, Direct Messages,
-Guild Messages and Message Content intents. Enable the privileged Message Content
-intent in the Discord developer portal. Grant View Channel, Send Messages,
-Embed Links and Read Message History in the configured channels. Channel decoding
-also needs Create Public Threads and Send Messages in Threads. Report collection
-and GitHub state sync need Manage Threads and access to the configured forum.
+Reports are tied to the GitHub repository they were first published to. To
+switch `GITHUB_REPOSITORY`, start with a fresh database.
 
-## Optional capabilities
+## Setup
 
-With `FEATURE_SMART_DECODER=true`, a recognized Test Media paste in a support
-channel gets its own thread, and a paste inside a forum post is answered in that
-post. Ordinary conversation and other channels are ignored. Deterministic guidance
-covers empty watch dates, failed Radarr or Sonarr lookups, missing dates and
-missing comparison values. The formatter stays unchanged. Rule links are built
-from the headings, table labels and code identifiers in `Rules.mdx` at index time.
-If an exact field is absent from the docs, the closest generated section is used.
+Create a bot with the `applications.commands` scope. Enable the Message Content
+intent, and the Server Members intent if welcome is on. In the channels the bot
+uses, grant View Channel, Send Messages, Embed Links and Read Message History,
+plus Create Public Threads, Send Messages in Threads and Manage Threads for
+decoding and reports. Giving the welcome role needs Manage Roles, with the bot's
+role above it.
 
-With screenshots enabled, send an image in a DM, in a support channel or forum
-post, or with an explicit bot mention. Images in other channels are ignored.
-Image reading also needs `LLM_VISION=true` and a
-configured vision provider. Without those, the bot asks for the copied text.
-Malformed or incomplete model output also falls back to asking for text.
+The GitHub App needs Issues read and write, and Metadata read. No webhook or
+inbound port is used.
 
-With `FEATURE_SUPPORT=true`, `/ask question:...` returns the three closest docs
-sections. This mode works without a provider and should be observed before
-configuring one. Provider failure, quota exhaustion, or invalid citations fall
-back to docs links. The index refreshes at boot; a failed refresh keeps the last
-complete index. A fresh installation without an index asks for a maintainer if
-its first refresh fails. Questions have a 30 second per-user cooldown and each
-message is answered at most once. Auto answering is off until support channels
-are configured. In a forum, the bot answers each post's opening message once and
-leaves the replies in that post alone. "This Did Not Help" thanks the member and,
-with reports on, offers a Report a Bug button. In the support channels it also
-pings `DISCORD_SUPPORT_ROLE_ID` once per answer, so a maintainer knows to step in.
+`DISCORD_TOKEN` is the only required variable. Flags accept `true`, `false`, `1`
+and `0`. Configuration errors are listed together, without echoing values.
 
-With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher that asks
-what the report is about. Only bugs become reports: a feature idea is sent to
-https://features.maintainerr.info/, and a question to the support forums and
-`/ask`. A bug opens the report form and creates a forum post immediately. The reporter can
-add raster images or small text logs, finish with Done or No Files, edit, or
-cancel. Submissions are limited to three per hour with a 30 second cooldown.
-Unsupported files, oversized files and binary files disguised as text are rejected.
-Text is redacted before SQLite storage and again before GitHub publication.
-
-Without GitHub App credentials, reports stay in Discord. With credentials, a
-member with the staff role can open Staff Actions and see an ephemeral Publish
-button. Discord cannot hide individual buttons by role in a shared message;
-both opening that private menu and publishing re-fetch and check the staff role.
-Nothing publishes automatically. The App needs Issues read/write and Metadata
-read permissions. No inbound port, webhook URL, webhook secret, or personal
-access token is used. Issues receive the `bug` and `source:discord` labels.
-Replies and state are synced every 60 seconds; labels map to matching forum tags.
-Files remain in Discord, with the issue linking back to the thread. Human replies
-reopen closed issues and archived threads. Idempotency markers and persisted job
-leases recover interrupted publication and relay operations.
-
-GitHub history is bound to its original repository. Changing the target, or
-finding old history without a binding, disables sync. Keep scratch and production
-databases separate.
-
-Use a free-tier or self-hosted provider; no provider is selected by default.
-Text prompts are redacted and retrieval is limited to three short sections.
-Screenshot pixels cannot be text-redacted, so screenshot reading is separately
-opted into. Quotas and provider failures never disable the deterministic decoder.
-
-Free tiers commonly fall outside the data-handling terms of their paid tiers,
-which can mean prompts are retained and used to improve the provider's models.
-Support questions carry logs and paths, so check the terms of the provider you
-configure. A self-hosted model keeps everything on your own hardware.
-
-With `FEATURE_WELCOME=true`, each new member is greeted in the welcome channel
-with the server's rules channel, the support channels, what the bot does and a
-link to this guide. Only the new member is mentioned. Enable the Server Members
-Intent in the Discord developer portal first: the bot requests that privileged
-intent only while welcome is on, so leaving the flag off never affects login.
-
-With `DISCORD_WELCOME_ROLE_ID` set, each new member also gets that role. A member
-who still has to accept the server rules gets it once they accept. The bot needs
-Manage Roles, with its own role above the welcome role.
+| Variable                      | Default                         | Purpose                                                                 |
+| ----------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
+| `DISCORD_TOKEN`               | required                        | Bot token. Secret.                                                      |
+| `DISCORD_GUILD_ID`            | empty                           | Register commands in this server only, and remove global copies.        |
+| `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                      |
+| `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error` or `silent`.                           |
+| `FEATURE_SUPPORT`             | `false`                         | Documentation answers and `/ask`.                                       |
+| `FEATURE_SMART_DECODER`       | `false`                         | Decode pastes in the support channels.                                  |
+| `FEATURE_REPORTS`             | `false`                         | Bug reports and GitHub publishing.                                      |
+| `FEATURE_WELCOME`             | `false`                         | Welcome new members.                                                    |
+| `FEATURE_SCREENSHOTS`         | `false`                         | Read Test Media screenshots.                                            |
+| `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated support channels or forums.                             |
+| `DISCORD_SUPPORT_ROLE_ID`     | empty                           | Role pinged when an answer did not help. Make it mentionable.           |
+| `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                   |
+| `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Text channel for the Report a Bug launcher. Required with reports.      |
+| `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish reports. Required with reports.                 |
+| `DISCORD_WELCOME_CHANNEL_ID`  | empty                           | Welcome channel. Required with welcome.                                 |
+| `DISCORD_WELCOME_ROLE_ID`     | empty                           | Role given to new members.                                              |
+| `GITHUB_APP_ID`               | empty                           | GitHub App ID. Set all three App values together.                       |
+| `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                    |
+| `GITHUB_PRIVATE_KEY`          | empty                           | App private key in PEM format; literal `\n` becomes a newline. Secret.  |
+| `GITHUB_REPOSITORY`           | empty                           | Issue repository as `owner/name`. Required with reports.                |
+| `LLM_BASE_URL`                | empty                           | OpenAI-compatible provider URL. Empty means documentation links only.   |
+| `LLM_API_KEY`                 | empty                           | Provider key, if needed. Secret.                                        |
+| `LLM_MODEL`                   | empty                           | Model name. Required with a provider URL.                               |
+| `LLM_VISION`                  | `false`                         | The model accepts images.                                               |
+| `LLM_REQUESTS_PER_MINUTE`     | `1`                             | Request rate. Keep it below the provider's limit.                       |
+| `LLM_DAILY_LIMIT`             | `100`                           | Model requests per UTC day.                                             |
+| `DOCS_REPOSITORY`             | `Maintainerr/Maintainerr_docs`  | Documentation source as `owner/name`.                                   |
+| `DOCS_REF`                    | `main`                          | Documentation branch, tag or commit.                                    |
+| `DOCS_ORIGIN`                 | `https://docs.maintainerr.info` | Published documentation site used in links.                             |
+| `ATTACHMENT_MAX_BYTES`        | `1048576`                       | Largest accepted file. A report holds at most ten files or pasted logs. |
 
 ## Running it
-
-With podman:
 
 ```
 podman run -d --name maintainerr_discord \
@@ -174,13 +124,10 @@ podman run -d --name maintainerr_discord \
   ghcr.io/maintainerr/maintainerr_discord:latest
 ```
 
-The image is OCI, so any runtime can pull it, but this project is podman-only:
-it is built with buildah in CI and run under podman in production.
+Keep the `/data` volume: it holds reports, pending GitHub jobs and the
+documentation index. Stop the bot before copying the database.
 
-The bot shuts down on SIGTERM, so `podman stop` closes the Discord connection
-cleanly rather than leaving the session hanging.
-
-From source, with Node 26 or newer:
+From source, with Node 26:
 
 ```
 yarn install
@@ -188,46 +135,15 @@ cp .env.example .env   # then fill in DISCORD_TOKEN
 MAINTAINERR_DISCORD_DB=./data/bot.sqlite yarn start
 ```
 
-`yarn dev` runs the same thing under `node --watch`.
+Every push to `main` publishes the image tagged `latest` and `sha-<commit>`. Pin
+the sha tag for a fixed version. The image is public and contains no secrets.
 
-The `/data` volume is required. SQLite stores reports, pending jobs and the docs
-index in `/data/bot.sqlite`; replacing a container without its volume loses them.
-`MAINTAINERR_DISCORD_DB` overrides the path. From source, set it to
-`./data/bot.sqlite` if `/data` is not writable. Stop the bot before copying the
-database for a backup, so the WAL has been checkpointed.
+## Development
 
-## Images
-
-Pushes to `main` publish to `ghcr.io/maintainerr/maintainerr_discord`. Every
-build is tagged twice: `latest`, and the full commit sha it was built from.
-Deployments that want a fixed version should pin the sha tag, since `latest`
-moves with every merge.
-
-The package is public, so treat the image as world readable. Nothing secret
-goes into it: no ENV secrets, no copied config, no `.env`. `DISCORD_TOKEN` is
-injected at runtime by whatever runs the container, and only `package.json`,
-`yarn.lock` and `src` are copied in.
-
-## Development and acceptance
-
-Run `yarn test` with Node 26. Tests use the standard library and fake services;
-they never write to the production tracker. `yarn format` runs pinned Prettier
-on demand with `npx`; it adds no runtime dependency. Prettier 3.6.2 is selected
-by the script, not pinned in yarn.lock. A cold cache needs npm registry access;
-offline formatting requires an already populated cache. Legacy formatter files and
-their existing tests are excluded from formatting to preserve their original
-content except for moved import paths. Pull requests run `node --test` and build
-and syntax-check the image. The Dependabot workflows are unchanged.
-
-Live integration requires the maintainer-owned setup from phase 0 of `PLAN.md`:
-a test guild, report channels and staff role, and a GitHub App installed on a
-scratch repository. Set `GITHUB_REPOSITORY` to that scratch repository before
-running integration checks. Do not test publication on `Maintainerr/Maintainerr`.
-Check the DM output against a saved payload, restart during collection and
-publication, race Publish, and verify that replies do not loop, closing archives
-the thread, replying reopens both sides, and unchanged polls return 304.
-`AUDIT.log` records implementation and validation, including outstanding live
-acceptance. No claim of production validation or multi-week observation is made.
+`yarn test` runs the tests with fake services; they never touch a real tracker.
+`yarn format` runs Prettier. Pull requests also build the image and syntax-check
+it. Test live publishing against a scratch repository, never against
+`Maintainerr/Maintainerr`.
 
 ## License
 
