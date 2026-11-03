@@ -13,7 +13,6 @@ test('only the Discord token is required and logging defaults to debug', () => {
     'featureSupport',
     'featureSmartDecoder',
     'featureScreenshots',
-    'featureTriage',
   ])
     assert.equal(config[key], false)
 })

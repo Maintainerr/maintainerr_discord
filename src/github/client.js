@@ -136,8 +136,6 @@ export function createGitHub(
       for (const [name, color] of [
         ['source:discord', '5865F2'],
         ['bug', 'd73a4a'],
-        ['enhancement', 'a2eeef'],
-        ['question', 'd876e3'],
       ]) {
         try {
           await client.request(

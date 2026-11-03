@@ -3,12 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ChannelType, Collection } from 'discord.js'
 import { openDatabase } from '../src/db.js'
 import { createReportService } from '../src/capabilities/reports/service.js'
 import { createReportDiscord } from '../src/capabilities/reports/discord.js'
-import { createDiscordRelay } from '../src/github/discord-relay.js'
-import { createProvider } from '../src/llm/provider.js'
 import { redactSecrets } from '../src/lib/redaction.js'
 import {
   classifyAttachment,
@@ -144,118 +141,37 @@ test('publishing requires staff and a completed collection, and queues only once
   assert.throws(() => reports.edit(report.id, 'fake-user', fields), /no longer/)
 })
 
-test('resolved triage never queues an issue and unresolved triage collects files', (t) => {
+test('only bugs open the report form; feature ideas and questions go elsewhere', async (t) => {
   const store = openDatabase(':memory:')
   t.after(() => store.close())
-  const reports = createReportService(store, {
-    featureTriage: true,
-    githubEnabled: true,
-  })
-  const report = reports.create({ ...reportInput(0), category: 'question' })
-  assert.equal(report.state, 'triage')
-  reports.triage(report.id, 'fake-user', true)
-  assert.equal(reports.get(report.id).state, 'resolved')
+  const config = { featureSupport: true, supportChannelIds: ['support-forum'] }
+  const discord = createReportDiscord(
+    {},
+    { config, store, logger: { debug() {}, warn() {} } }
+  )
+  const forms = []
+  const replies = []
+  for (const value of ['bug', 'feature', 'question'])
+    await discord.interaction({
+      customId: 'report:category',
+      values: [value],
+      isStringSelectMenu: () => true,
+      showModal: async (modal) => forms.push(modal.toJSON().custom_id),
+      update: async (message) => replies.push(message.content),
+    })
+  assert.deepEqual(forms, ['report:create:bug'])
+  assert.ok(replies[0].includes('https://features.maintainerr.info/'))
+  assert.ok(replies[1].includes('<#support-forum>'))
+  assert.ok(replies[1].includes('/ask'))
+  // A forged form submission still cannot file anything but a bug.
   assert.throws(
     () =>
-      reports.requestPublish(report.id, { staff: true, guildId: 'fake-guild' }),
-    /finish/
+      createReportService(store, config).create({
+        ...reportInput(0),
+        category: 'feature',
+      }),
+    /bug/
   )
-  assert.equal(
-    store.db.prepare('SELECT count(*) AS count FROM jobs').get().count,
-    0
-  )
-  const another = reports.create({
-    ...reportInput(30000),
-    category: 'question',
-  })
-  assert.equal(
-    reports.triage(another.id, 'fake-user', false).state,
-    'collecting'
-  )
-})
-
-test('triage restoration and concurrent delivery spend quota and post an answer only once', async (t) => {
-  const store = openDatabase(':memory:')
-  t.after(() => store.close())
-  const config = {
-    featureTriage: true,
-    forumChannelId: 'forum',
-    launcherChannelId: 'launcher',
-  }
-  const reports = createReportService(store, config)
-  const report = reports.create({ ...reportInput(0), category: 'question' })
-  reports.attachThread(report.id, 'thread', 'control')
-  const messages = new Collection()
-  const client = {
-    user: { id: 'bot' },
-    channels: { fetch: async (id) => channels.get(id) },
-  }
-  const launcher = {
-    id: 'launch-message',
-    author: client.user,
-    components: [{ components: [{ customId: 'report:start' }] }],
-    edit: async () => launcher,
-  }
-  store.setCursor('reports:launcher', launcher.id)
-  const channels = new Map([
-    ['forum', { type: ChannelType.GuildForum, guildId: 'fake-guild' }],
-    [
-      'launcher',
-      {
-        guildId: 'fake-guild',
-        isTextBased: () => true,
-        messages: { fetch: async () => launcher },
-      },
-    ],
-    [
-      'thread',
-      {
-        id: 'thread',
-        members: { add: async () => {} },
-        messages: { fetch: async () => messages, edit: async () => {} },
-        send: async (message) => {
-          const sent = {
-            ...message,
-            id: `answer-${messages.size}`,
-            author: client.user,
-          }
-          messages.set(sent.id, sent)
-          return sent
-        },
-      },
-    ],
-  ])
-  let calls = 0
-  const provider = createProvider(
-    { llmBaseUrl: 'http://local.test', llmModel: 'fake', llmDailyLimit: 5 },
-    store,
-    {
-      now: () => 0,
-      queue: { run: (fn) => fn() },
-      fetchFn: async () => {
-        calls += 1
-        return Response.json({
-          choices: [{ message: { content: 'Documented advice.' } }],
-        })
-      },
-    }
-  )
-  const ctx = {
-    config,
-    store,
-    logger: { debug() {} },
-    answer: (question) =>
-      provider.complete({ system: 'Use docs only', user: question }),
-  }
-  ctx.relay = createDiscordRelay(client, ctx)
-  const first = createReportDiscord(client, ctx)
-  await Promise.all([first.ready(), first.ready()])
-  ctx.relay = createDiscordRelay(client, ctx)
-  await createReportDiscord(client, ctx).ready()
-  assert.equal(messages.size, 1)
-  assert.equal(calls, 1)
-  assert.equal(JSON.parse(store.getCursor('llm:daily').cursor).used, 1)
-  assert.equal(reports.get(report.id).state, 'triage')
 })
 
 test('attachment allowlist rejects size, executables and disguised binary files', async () => {

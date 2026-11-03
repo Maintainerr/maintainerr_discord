@@ -13,31 +13,35 @@ import { createReportService, ReportError, FIELD_LIMITS } from './service.js'
 import { safeMessage } from '../../lib/http.js'
 import { downloadAttachment } from '../../lib/attachments.js'
 import { describeError } from '../../lib/logging.js'
+import { supportChannels } from '../welcome/index.js'
 
-const labels = { bug: 'Bug', feature: 'Feature Request', question: 'Question' }
+// Only bugs become GitHub issues. Feature ideas and questions are sent to the
+// places that handle them.
+const FEATURES_URL = 'https://features.maintainerr.info/'
+const choices = [
+  ['bug', 'Report a Bug', 'Something in Maintainerr is broken.'],
+  ['feature', 'Suggest a Feature', 'Ideas go to the feature board.'],
+  ['question', 'Ask a Question', 'Get help in the support forums.'],
+]
+const redirects = {
+  feature: () =>
+    `Feature ideas go to the feature board at ${FEATURES_URL}. Search it first, and vote if your idea is already there.`,
+  question: (config) => {
+    const help = supportChannels(config) || 'the support forums'
+    return `Ask in ${help}, where a maintainer or another member can help.${config.featureSupport ? ' You can also try `/ask`, which searches the documentation.' : ''}`
+  },
+}
 const fieldLabels = {
   version: 'Maintainerr Version and Install Method',
   server: 'Media Server and Version',
-  happened: 'What Happened or What Would You Like to Do',
-  steps: 'Steps to Reproduce or Your Use Case',
+  happened: 'What Happened',
+  steps: 'Steps to Reproduce',
 }
 const button = (id, label, style = ButtonStyle.Secondary) =>
   new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style)
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons)
 
 export function reportControls(report) {
-  if (report.state === 'triage')
-    return [
-      row(
-        button(
-          `report:resolved:${report.id}`,
-          'This Solved It',
-          ButtonStyle.Success
-        ),
-        button(`report:unresolved:${report.id}`, 'Still Need Help'),
-        button(`report:cancel:${report.id}`, 'Cancel')
-      ),
-    ]
   if (!['collecting', 'ready'].includes(report.state)) return []
   const buttons =
     report.state === 'collecting'
@@ -56,19 +60,17 @@ export function reportControls(report) {
 
 export function reportSummary(report) {
   const fields = JSON.parse(report.fields)
-  return `**${labels[report.category]} Report**\nState: ${report.state}\n\n${Object.entries(
+  return `**Bug Report**\nState: ${report.state}\n\n${Object.entries(
     fieldLabels
   )
     .map(([key, label]) => `**${label}**\n${fields[key]}`)
     .join('\n\n')}\n\nReport ID: ${report.id}`
 }
 
-function reportModal(category, report) {
+function reportModal(report) {
   const modal = new ModalBuilder()
-    .setCustomId(
-      report ? `report:save:${report.id}` : `report:create:${category}`
-    )
-    .setTitle(`${labels[category]} Report`)
+    .setCustomId(report ? `report:save:${report.id}` : 'report:create:bug')
+    .setTitle('Bug Report')
   const fields = report ? JSON.parse(report.fields) : {}
   for (const [key, label] of Object.entries(fieldLabels)) {
     const input = new TextInputBuilder()
@@ -165,15 +167,19 @@ export function createReportDiscord(client, ctx) {
       return
     }
     await interaction.reply({
-      ...safeMessage('Choose a report category.'),
+      ...safeMessage('What would you like to do?'),
       flags: MessageFlags.Ephemeral,
       components: [
         new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('report:category')
-            .setPlaceholder('Report category')
+            .setPlaceholder('Choose one')
             .addOptions(
-              Object.entries(labels).map(([value, label]) => ({ value, label }))
+              choices.map(([value, label, description]) => ({
+                value,
+                label,
+                description,
+              }))
             )
         ),
       ],
@@ -218,10 +224,10 @@ export function createReportDiscord(client, ctx) {
     }
     const payload = {
       ...safeMessage(
-        '**Report a Bug**\nA maintainer reviews each bug report before it is published on GitHub. Reports are public, so leave out passwords and API keys.\nSuggest features at https://features.maintainerr.info/. For help with your setup, use the support forums.'
+        `**Report a Bug**\nA maintainer reviews each bug report before it is published on GitHub. Reports are public, so leave out passwords and API keys.\nSuggest features at ${FEATURES_URL}. For help with your setup, use the support forums.`
       ),
       components: [
-        row(button('report:start', 'Report a Problem', ButtonStyle.Primary)),
+        row(button('report:start', 'Report a Bug', ButtonStyle.Primary)),
       ],
     }
     const message = existing
@@ -229,17 +235,9 @@ export function createReportDiscord(client, ctx) {
       : await channel.send(payload)
     ctx.store.setCursor('reports:launcher', message.id)
   }
-  async function triage(report, thread) {
-    if (report.state !== 'triage') return
-    // Restoring an existing answer must not spend model quota again.
-    await ctx.relay.sendOnce(thread.id, `triage:${report.id}`, () =>
-      ctx.answer(JSON.parse(report.fields).happened)
-    )
-  }
 
   return {
     ...service,
-    begin,
     update,
     async ready() {
       forum = await client.channels.fetch(ctx.config.forumChannelId)
@@ -252,9 +250,8 @@ export function createReportDiscord(client, ctx) {
         if (ctx.store.getCursor(`discord:deleted-thread:${report.thread_id}`))
           continue
         try {
-          const thread = await ensureThread(report)
+          await ensureThread(report)
           await update(service.get(report.id))
-          await triage(report, thread)
         } catch (err) {
           if (![10003, 50001, 50013].includes(err.code)) throw err
           if (err.code === 10003)
@@ -279,9 +276,17 @@ export function createReportDiscord(client, ctx) {
           return
         }
         if (action === 'category' && interaction.isStringSelectMenu()) {
-          if (!labels[interaction.values[0]])
-            throw new ReportError('Choose a valid category.')
-          await interaction.showModal(reportModal(interaction.values[0]))
+          const choice = interaction.values[0]
+          if (choice === 'bug') {
+            await interaction.showModal(reportModal())
+            return
+          }
+          if (!redirects[choice])
+            throw new ReportError('Choose a valid option.')
+          await interaction.update({
+            ...safeMessage(redirects[choice](ctx.config)),
+            components: [],
+          })
           return
         }
         const report = action === 'create' ? null : service.get(id)
@@ -293,7 +298,7 @@ export function createReportDiscord(client, ctx) {
         if (action === 'edit') {
           if (report.reporter_id !== interaction.user.id)
             throw new ReportError('Only the reporter can edit this report.')
-          await interaction.showModal(reportModal(report.category, report))
+          await interaction.showModal(reportModal(report))
           return
         }
         await interaction.deferReply({ flags: MessageFlags.Ephemeral })
@@ -319,7 +324,6 @@ export function createReportDiscord(client, ctx) {
               `Your report is open in <#${thread.id}>. Add images or text logs there, then choose Done or No Files.`
             )
           )
-          await triage(created, thread)
           return
         }
         let changed = report
@@ -329,12 +333,6 @@ export function createReportDiscord(client, ctx) {
           content = 'Your report is ready for a maintainer to review.'
         } else if (action === 'cancel')
           changed = service.cancel(id, interaction.user.id)
-        else if (action === 'resolved' || action === 'unresolved')
-          changed = service.triage(
-            id,
-            interaction.user.id,
-            action === 'resolved'
-          )
         else if (action === 'save' && interaction.isModalSubmit())
           changed = service.edit(
             id,
