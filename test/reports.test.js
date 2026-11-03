@@ -110,6 +110,35 @@ test('collecting report and redacted logs survive a restart', () => {
   }
 })
 
+test('publishing requires staff and a completed collection, and queues only once', (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const reports = createReportService(store, { githubEnabled: true })
+  const report = reports.create(reportInput(0))
+  reports.attachThread(report.id, 'fake-thread', 'fake-control')
+  assert.throws(
+    () =>
+      reports.requestPublish(report.id, {
+        staff: false,
+        guildId: 'fake-guild',
+      }),
+    /staff/
+  )
+  assert.throws(
+    () =>
+      reports.requestPublish(report.id, { staff: true, guildId: 'fake-guild' }),
+    /finish/
+  )
+  reports.finish(report.id, 'fake-user')
+  reports.requestPublish(report.id, { staff: true, guildId: 'fake-guild' })
+  reports.requestPublish(report.id, { staff: true, guildId: 'fake-guild' })
+  assert.equal(
+    store.db.prepare('SELECT count(*) AS count FROM jobs').get().count,
+    1
+  )
+  assert.throws(() => reports.edit(report.id, 'fake-user', fields), /no longer/)
+})
+
 test('attachment allowlist rejects size, executables and disguised binary files', async () => {
   assert.match(
     classifyAttachment(

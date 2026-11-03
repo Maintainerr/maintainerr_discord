@@ -98,7 +98,14 @@ async function findThread(forum, suffix) {
 export function createReportDiscord(client, ctx) {
   const service = createReportService(ctx.store, ctx.config)
   let forum
-  const fetchThread = async (id) => client.channels.fetch(id)
+  const fetchThread = async (id) => {
+    const thread = await client.channels.fetch(id)
+    if (!thread)
+      throw Object.assign(new Error('Discord channel is unavailable.'), {
+        code: 50001,
+      })
+    return thread
+  }
   async function update(report) {
     if (!report.thread_id) return
     const thread = await fetchThread(report.thread_id)
@@ -223,8 +230,23 @@ export function createReportDiscord(client, ctx) {
         )
       await launcher()
       for (const report of service.pending()) {
-        const thread = await ensureThread(report)
-        await update(service.get(report.id))
+        if (ctx.store.getCursor(`discord:deleted-thread:${report.thread_id}`))
+          continue
+        try {
+          await ensureThread(report)
+          await update(service.get(report.id))
+        } catch (err) {
+          if (![10003, 50001, 50013].includes(err.code)) throw err
+          if (err.code === 10003)
+            ctx.store.setCursor(
+              `discord:deleted-thread:${report.thread_id}`,
+              'true'
+            )
+          ctx.logger.debug(
+            `Report ${report.id} could not restore its thread:`,
+            describeError(err)
+          )
+        }
       }
     },
     async interaction(interaction) {
@@ -303,9 +325,7 @@ export function createReportDiscord(client, ctx) {
               'Only the configured staff role can publish reports.'
             )
           await interaction.editReply({
-            ...safeMessage(
-              'GitHub publishing is disabled. Reports stay in Discord.'
-            ),
+            ...safeMessage('Review this report, then publish it to GitHub.'),
             components: ctx.config.githubEnabled
               ? [
                   row(

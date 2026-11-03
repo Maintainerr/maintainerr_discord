@@ -164,9 +164,63 @@ export function createReportService(store, config) {
           'SELECT * FROM attachments WHERE report_id = ? ORDER BY created_at'
         )
         .all(id),
-    requestPublish() {
-      throw new ReportError('GitHub publishing is disabled.')
+    requestPublish(id, { staff, guildId }) {
+      if (!staff)
+        throw new ReportError(
+          'Only the configured staff role can publish reports.'
+        )
+      if (!config.githubEnabled)
+        throw new ReportError(
+          'GitHub publishing is disabled. A maintainer must configure the GitHub App first.'
+        )
+      return store.transaction(() => {
+        const report = get(id)
+        if (!report || report.guild_id !== guildId)
+          throw new ReportError('Report not found in this server.')
+        if (report.state === 'published' || report.state === 'publishing')
+          return report
+        if (report.state !== 'ready' || !report.thread_id)
+          throw new ReportError(
+            'The reporter must finish collecting files first.'
+          )
+        store.enqueue(
+          'publish',
+          { reportId: id },
+          { dedupeKey: `publish:${id}` }
+        )
+        db.prepare(
+          "UPDATE reports SET state = 'publishing', updated_at = ? WHERE id = ?"
+        ).run(Date.now(), id)
+        return get(id)
+      })
     },
-    queueReply() {},
+    queueReply(report, message) {
+      if (
+        report.state !== 'published' ||
+        !config.githubEnabled ||
+        message.author.bot
+      )
+        return
+      const body =
+        redactSecrets(message.content || '') +
+        (message.attachments?.size
+          ? `\n\nFiles: https://discord.com/channels/${report.guild_id}/${report.thread_id}/${message.id}`
+          : '')
+      if (!body.trim()) return
+      db.prepare(
+        `INSERT INTO jobs (kind, payload, dedupe_key, available_at, created_at) VALUES ('comment', ?, ?, ?, ?)
+        ON CONFLICT(dedupe_key) DO NOTHING`
+      ).run(
+        JSON.stringify({
+          reportId: report.id,
+          messageId: message.id,
+          author: redactSecrets(message.author.username),
+          body,
+        }),
+        `comment:${message.id}`,
+        Date.now(),
+        Date.now()
+      )
+    },
   }
 }
