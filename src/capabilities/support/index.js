@@ -53,7 +53,7 @@ export default {
       else
         await interaction.reply({
           ...safeMessage(
-            'Please ask a maintainer in the support channel. Report intake is currently disabled.'
+            'Thanks for letting us know. Add more details here and a maintainer will take a look.'
           ),
           flags: MessageFlags.Ephemeral,
         })
