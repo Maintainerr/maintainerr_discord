@@ -3,8 +3,10 @@ import testmedia from './testmedia/index.js'
 import support from './support/index.js'
 import reports from './reports/index.js'
 import welcome from './welcome/index.js'
+import info from './info/index.js'
+import roles from './roles/index.js'
 
-const capabilities = [testmedia, support, reports, welcome]
+const capabilities = [testmedia, support, reports, welcome, info, roles]
 export default capabilities
 
 // Extra intents come only from enabled capabilities, so shipping a feature whose

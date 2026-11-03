@@ -6,8 +6,9 @@ import welcome, { GUIDE_URL } from '../src/capabilities/welcome/index.js'
 
 test('the privileged member intent is requested only while welcome is on', () => {
   const members = GatewayIntentBits.GuildMembers
-  assert.ok(!gatewayIntents({ featureWelcome: false }).includes(members))
-  assert.ok(gatewayIntents({ featureWelcome: true }).includes(members))
+  const off = { featureWelcome: false, selfRoleIds: [] }
+  assert.ok(!gatewayIntents(off).includes(members))
+  assert.ok(gatewayIntents({ ...off, featureWelcome: true }).includes(members))
 })
 
 test('a new member is greeted once, and only they are mentioned', async () => {
@@ -52,6 +53,7 @@ test('a new member is greeted once, and only they are mentioned', async () => {
     '<#rule-help>',
     '/ask',
     '/testmedia',
+    '/help',
     GUIDE_URL,
   ])
     assert.ok(sent[0].content.includes(part), part)

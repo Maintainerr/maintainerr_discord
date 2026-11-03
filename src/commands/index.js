@@ -43,12 +43,14 @@ export function createCommandRegistry(
       commands.set(command.data.name, command)
     }
   }
+  const definitions = [...commands.values()].map((command) => command.data)
+  // /help lists exactly what is registered.
+  ctx.commands = definitions
 
   return {
     async register(client) {
       if (!client.application) return
 
-      const definitions = [...commands.values()].map((command) => command.data)
       if (ctx.config.discordGuildId) {
         const guild = await client.guilds.fetch(ctx.config.discordGuildId)
         await upsertCommands(guild.commands, definitions, managedNames)
