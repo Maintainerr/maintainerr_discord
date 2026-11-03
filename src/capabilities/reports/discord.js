@@ -218,7 +218,7 @@ export function createReportDiscord(client, ctx) {
     }
     const payload = {
       ...safeMessage(
-        'Need help with Maintainerr? File a report here. A maintainer reviews every report before publishing to GitHub.'
+        '**Report a Bug or Feature Request**\nA maintainer reviews each report before it is published on GitHub. Reports are public, so leave out passwords and API keys.\nFor help with your setup, use the support forums.'
       ),
       components: [
         row(button('report:start', 'Report a Problem', ButtonStyle.Primary)),
