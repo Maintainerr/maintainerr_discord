@@ -10,6 +10,7 @@ export function readConfig(env = process.env) {
     launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
     welcomeChannelId: env.DISCORD_WELCOME_CHANNEL_ID?.trim() || null,
+    welcomeRoleId: env.DISCORD_WELCOME_ROLE_ID?.trim() || null,
     supportChannelIds: (env.DISCORD_SUPPORT_CHANNEL_IDS ?? '')
       .split(',')
       .map((id) => id.trim())
@@ -84,6 +85,14 @@ export function readConfig(env = process.env) {
   if (config.welcomeChannelId && !/^\d{17,20}$/.test(config.welcomeChannelId))
     errors.push(
       'DISCORD_WELCOME_CHANNEL_ID must be a Discord ID of 17 to 20 digits.'
+    )
+  if (config.welcomeRoleId && !/^\d{17,20}$/.test(config.welcomeRoleId))
+    errors.push(
+      'DISCORD_WELCOME_ROLE_ID must be a Discord ID of 17 to 20 digits.'
+    )
+  if (config.welcomeRoleId && config.welcomeRoleId === config.staffRoleId)
+    errors.push(
+      'DISCORD_WELCOME_ROLE_ID must not be DISCORD_STAFF_ROLE_ID, since every new member gets it.'
     )
   if (config.featureWelcome && !config.welcomeChannelId)
     errors.push(

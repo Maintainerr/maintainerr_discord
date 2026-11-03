@@ -58,6 +58,7 @@ are reported together and do not print supplied values.
 | `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                     |
 | `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated channels or forums for channel pastes, screenshots and automatic answers. Empty means DMs and `/ask` only.          |
 | `DISCORD_WELCOME_CHANNEL_ID`  | empty                           | Channel for welcome messages. Required with welcome.                                                                                |
+| `DISCORD_WELCOME_ROLE_ID`     | empty                           | Role every new member gets once they have accepted the server rules. Needs welcome and Manage Roles.                                |
 | `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                                                        |
 | `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                                                                |
 | `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                                                     |
@@ -155,6 +156,10 @@ with the server's rules channel, the support channels, what the bot does and a
 link to this guide. Only the new member is mentioned. Enable the Server Members
 Intent in the Discord developer portal first: the bot requests that privileged
 intent only while welcome is on, so leaving the flag off never affects login.
+
+With `DISCORD_WELCOME_ROLE_ID` set, each new member also gets that role. A member
+who still has to accept the server rules gets it once they accept. The bot needs
+Manage Roles, with its own role above the welcome role.
 
 ## Running it
 

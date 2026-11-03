@@ -57,3 +57,54 @@ test('a new member is greeted once, and only they are mentioned', async () => {
   ])
     assert.ok(sent[0].content.includes(part), part)
 })
+
+test('new members get the welcome role once they have accepted the rules', async () => {
+  const handlers = {}
+  const granted = []
+  welcome.register(
+    {
+      on: (event, fn) => (handlers[event] = fn),
+      channels: {
+        fetch: async () => ({ guildId: 'guild', send: async () => {} }),
+      },
+    },
+    {
+      config: {
+        welcomeChannelId: 'welcome',
+        welcomeRoleId: 'member-role',
+        supportChannelIds: [],
+      },
+      logger: { debug() {}, warn() {} },
+    }
+  )
+  const member = (
+    id,
+    { pending = false, bot = false, guild = 'guild' } = {}
+  ) => ({
+    id,
+    pending,
+    user: { bot, tag: id },
+    guild: {
+      id: guild,
+      roles: {
+        cache: new Map(
+          guild === 'guild'
+            ? [['member-role', { id: 'member-role', name: 'everyone' }]]
+            : []
+        ),
+      },
+    },
+    roles: { add: async (role) => granted.push(`${id} ${role?.id}`) },
+  })
+  await handlers.guildMemberAdd(member('ready'))
+  await handlers.guildMemberAdd(member('screening', { pending: true }))
+  await handlers.guildMemberAdd(member('helper-bot', { bot: true }))
+  await handlers.guildMemberAdd(member('stranger', { guild: 'other-guild' }))
+  await handlers.guildMemberUpdate(
+    member('screening', { pending: true }),
+    member('screening')
+  )
+  // Any later update, such as after a moderator removed the role, is ignored.
+  await handlers.guildMemberUpdate(member('ready'), member('ready'))
+  assert.deepEqual(granted, ['ready member-role', 'screening member-role'])
+})

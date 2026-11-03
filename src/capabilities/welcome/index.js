@@ -35,8 +35,29 @@ export default {
   // Privileged: requested only while this capability is enabled.
   intents: [GatewayIntentBits.GuildMembers],
   register(client, ctx) {
+    async function giveRole(member) {
+      const role = member.guild.roles.cache.get(ctx.config.welcomeRoleId)
+      if (!role) return
+      try {
+        await member.roles.add(role, 'Welcome role')
+        ctx.logger.debug(`[welcome] ${member.user.tag} got ${role.name}`)
+      } catch (err) {
+        if (err.code === 50013)
+          ctx.logger.warn(
+            'Welcome role failed. Give the bot Manage Roles and move its role above the welcome role.'
+          )
+        ctx.logger.debug(describeError(err))
+      }
+    }
+    // Pending members have not accepted the server rules yet, so the role
+    // waits until they do.
+    client.on('guildMemberUpdate', async (old, member) => {
+      if (ctx.config.welcomeRoleId && old.pending && !member.pending)
+        await giveRole(member)
+    })
     client.on('guildMemberAdd', async (member) => {
       if (member.user.bot) return
+      if (ctx.config.welcomeRoleId && !member.pending) await giveRole(member)
       try {
         const channel = await client.channels.fetch(ctx.config.welcomeChannelId)
         if (channel?.guildId !== member.guild.id) return
