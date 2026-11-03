@@ -27,6 +27,9 @@ export function reserveQuestion(ctx, userId, questionId, now = Date.now()) {
 }
 
 export async function handleAsk(interaction, ctx) {
+  ctx.logger.debug(
+    `[ask] ${interaction.user.tag} in ${interaction.guild ? `#${interaction.channel?.name}` : 'DM'}`
+  )
   if (!reserveQuestion(ctx, interaction.user.id, interaction.id)) {
     await interaction.reply({
       ...safeMessage('Please wait 30 seconds between questions.'),

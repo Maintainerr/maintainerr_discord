@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ChannelType } from 'discord.js'
+import { ChannelType, MessageFlags } from 'discord.js'
 import { allowsScreenshot } from '../src/capabilities/testmedia/scope.js'
 import testmedia from '../src/capabilities/testmedia/index.js'
 import support from '../src/capabilities/support/index.js'
@@ -113,28 +113,61 @@ test('channel pastes are decoded only in support channels and their forum posts'
   )
 })
 
-test('support answers each forum post once, on its opening message', async (t) => {
+test('support answers each forum post once, using its title, and leaves pastes to the decoder', async (t) => {
   const store = openDatabase(':memory:')
   t.after(() => store.close())
+  const asked = []
   const onMessage = capture(support.register, {
     config: { featureScreenshots: false, supportChannelIds: ['support'] },
     store,
-    answer: async () => 'An answer.',
+    logger: { debug() {} },
+    answer: async (question) => {
+      asked.push(question)
+      return 'An answer.'
+    },
   })
   const answered = []
   // A separate author per message, so the per-user cooldown cannot hide a reply.
-  const message = (id, channelId, parentId, author) => ({
+  const message = (id, channelId, parentId, author, content, name) => ({
     id,
     channelId,
-    channel: { parentId },
-    content: 'How do I keep a show out of a collection?',
-    author: { id: author, bot: false },
-    attachments: { some: () => false },
-    reply: async () => answered.push(id),
+    channel: { parentId, name },
+    content,
+    author: { id: author, bot: false, tag: author },
+    attachments: [],
+    reply: async (payload) => answered.push({ id, payload }),
   })
-  await onMessage(message('post', 'post', 'support', 'first'))
-  await onMessage(message('reply', 'post', 'support', 'second'))
-  await onMessage(message('elsewhere', 'elsewhere', 'other', 'third'))
-  await onMessage(message('direct', 'support', null, 'fourth'))
-  assert.deepEqual(answered, ['post', 'direct'])
+  const paste = JSON.stringify(payload([section([rule()])]))
+  await onMessage(
+    message(
+      'post',
+      'post',
+      'support',
+      'first',
+      'help',
+      'Why is my collection empty?'
+    )
+  )
+  await onMessage(message('reply', 'post', 'support', 'second', 'More detail.'))
+  await onMessage(
+    message('elsewhere', 'elsewhere', 'other', 'third', 'A question?')
+  )
+  await onMessage(message('direct', 'support', null, 'fourth', 'A question?'))
+  await onMessage(
+    message(
+      'pasted',
+      'pasted',
+      'support',
+      'fifth',
+      `My result:\n\n${paste}`,
+      'Rule help'
+    )
+  )
+  assert.deepEqual(
+    answered.map((entry) => entry.id),
+    ['post', 'direct']
+  )
+  assert.equal(asked[0], 'Why is my collection empty?\nhelp')
+  assert.equal(answered[0].payload.flags, MessageFlags.SuppressEmbeds)
+  assert.match(answered[0].payload.content, /Tip: paste your Test Media output/)
 })

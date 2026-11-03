@@ -1,3 +1,5 @@
+import { MessageFlags } from 'discord.js'
+
 export async function readLimited(response, limit) {
   const reader = response.body.getReader()
   const chunks = []
@@ -21,8 +23,14 @@ export async function readLimited(response, limit) {
 // is a separate explicit allowlist of ids. Keeping parse empty means nothing is
 // pinged except the ids passed in, so a staff alert can reach a human without
 // opening an everyone/here vector.
+// Link previews would turn every cited docs link, and any URL a user put in a
+// report, into a large card. The decoder's own embeds are sent separately.
 export function safeMessage(text, roles = []) {
-  return { content: text, allowedMentions: { parse: [], roles } }
+  return {
+    content: text,
+    allowedMentions: { parse: [], roles },
+    flags: MessageFlags.SuppressEmbeds,
+  }
 }
 
 // RFC 9110 allows Retry-After as either delay-seconds or an HTTP-date. Both the
