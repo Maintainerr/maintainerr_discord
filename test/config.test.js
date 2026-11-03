@@ -89,22 +89,41 @@ test('reports cannot be enabled without naming the target repository', () => {
   )
 })
 
-test('support channels are a comma-separated list of Discord IDs', () => {
-  const { config, errors } = readConfig({
-    DISCORD_TOKEN: 'fake-token',
-    DISCORD_SUPPORT_CHANNEL_IDS: '123456789012345678, 223456789012345678',
-  })
-  assert.deepEqual(config.supportChannelIds, [
-    '123456789012345678',
-    '223456789012345678',
-  ])
-  assert.deepEqual(errors, [])
-  assert.ok(
-    readConfig({
+test('channel and role lists are comma-separated Discord IDs', () => {
+  for (const [variable, key] of [
+    ['DISCORD_SUPPORT_CHANNEL_IDS', 'supportChannelIds'],
+    ['DISCORD_SELF_ROLE_IDS', 'selfRoleIds'],
+  ]) {
+    const { config, errors } = readConfig({
       DISCORD_TOKEN: 'fake-token',
-      DISCORD_SUPPORT_CHANNEL_IDS: '123456789012345678,support',
-    }).errors.some((error) => error.includes('DISCORD_SUPPORT_CHANNEL_IDS'))
+      [variable]: '123456789012345678, 223456789012345678,123456789012345678',
+    })
+    assert.deepEqual(config[key], ['123456789012345678', '223456789012345678'])
+    assert.deepEqual(errors, [])
+    assert.ok(
+      readConfig({
+        DISCORD_TOKEN: 'fake-token',
+        [variable]: '123456789012345678,support',
+      }).errors.some((error) => error.includes(variable))
+    )
+  }
+})
+
+test('self-assignable roles fit one message and never include the staff role', () => {
+  const ids = [...Array(26).keys()].map(
+    (index) => `1234567890123456${String(index).padStart(2, '0')}`
   )
+  for (const [env, rejected] of [
+    [{ DISCORD_SELF_ROLE_IDS: ids.slice(0, 25).join(',') }, false],
+    [{ DISCORD_SELF_ROLE_IDS: ids.join(',') }, true],
+    [{ DISCORD_SELF_ROLE_IDS: ids[0], DISCORD_STAFF_ROLE_ID: ids[0] }, true],
+  ])
+    assert.equal(
+      readConfig({ DISCORD_TOKEN: 'fake-token', ...env }).errors.some((error) =>
+        error.includes('DISCORD_SELF_ROLE_IDS')
+      ),
+      rejected
+    )
 })
 
 test('welcome cannot be enabled without its channel', () => {

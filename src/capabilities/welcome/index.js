@@ -5,19 +5,23 @@ import { describeError } from '../../lib/logging.js'
 export const GUIDE_URL =
   'https://github.com/Maintainerr/maintainerr_discord#using-it'
 
+export function supportLines(config) {
+  if (!config.supportChannelIds.length) return []
+  const help = config.supportChannelIds.map((id) => `<#${id}>`).join(' or ')
+  return [
+    `- Ask for help in ${help}. Search there first, since your question may already be answered.`,
+    '- Paste your Test Media output in a post to have it explained.',
+  ]
+}
+
 export function welcomeText(member, config) {
   const lines = [`Welcome to Maintainerr, <@${member.id}>!`, '']
   if (member.guild.rulesChannelId)
     lines.push(`- Start with <#${member.guild.rulesChannelId}>.`)
-  if (config.supportChannelIds.length) {
-    const help = config.supportChannelIds.map((id) => `<#${id}>`).join(' or ')
-    lines.push(
-      `- Ask for help in ${help}. Search there first, since your question may already be answered.`,
-      '- Paste your Test Media output in a post to have it explained.'
-    )
-  }
   lines.push(
+    ...supportLines(config),
     '- `/ask` searches the documentation from any channel, and `/testmedia` explains a Test Media result privately in a DM.',
+    '- `/help` lists everything the bot can do.',
     '',
     `How to use the bot: ${GUIDE_URL}`
   )

@@ -22,6 +22,11 @@ Anywhere in the server:
 - `/ask` searches the documentation for your question.
 - `/testmedia` opens a private DM where you can paste results, as many as you
   like, without starting a new session.
+- `/help` lists everything the bot can do, with links to the documentation.
+- `/delete` explains when Maintainerr takes action on your media, and `/unraid`
+  shows the Unraid steps for upgrading to v2.0.0. Both answers are public, so
+  you can post one in someone's thread.
+- `/roles` adds or removes announcement roles.
 
 To get your Test Media output:
 
@@ -52,6 +57,7 @@ are reported together and do not print supplied values.
 | `FEATURE_WELCOME`             | `false`                         | Greet new members. Needs the privileged Server Members Intent.                                                                      |
 | `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                               |
 | `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                      |
+| `DISCORD_SELF_ROLE_IDS`       | empty                           | Comma-separated roles anyone can add or remove with `/roles`, up to 25. Empty hides `/roles`. List only announcement roles.         |
 | `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                     |
 | `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated channels or forums for channel pastes, screenshots and automatic answers. Empty means DMs and `/ask` only.          |
 | `DISCORD_WELCOME_CHANNEL_ID`  | empty                           | Channel for welcome messages. Required with welcome.                                                                                |
@@ -81,6 +87,8 @@ intent in the Discord developer portal. Grant View Channel, Send Messages,
 Embed Links and Read Message History in the configured channels. Channel decoding
 also needs Create Public Threads and Send Messages in Threads. Report collection
 and GitHub state sync need Manage Threads and access to the configured forum.
+`/roles` needs Manage Roles, with the bot's role above the listed roles and
+below staff roles.
 
 ## Optional capabilities
 
