@@ -23,17 +23,105 @@ paste as many results as you like in the same DM without starting a new session.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill it in.
+Copy `.env.example` to `.env` for local development. Inject secrets at runtime in
+containers. `DISCORD_TOKEN` is the only required variable. Configuration errors
+are reported together and do not print supplied values.
 
-| Variable           | Required | Purpose                                                                                                                                                      |
-| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DISCORD_TOKEN`    | yes      | Bot token from the Discord developer portal. Anyone holding it controls the bot, so keep it out of version control.                                          |
-| `LOG_LEVEL`        | no       | Minimum log level: debug (default), info, warn, error, or silent.                                                                                            |
-| `DISCORD_GUILD_ID` | no       | Register the slash command in one guild instead of globally. Guild commands appear immediately, global ones can take up to an hour. Useful while developing. |
+| Variable                      | Default                         | Purpose                                                                                            |
+| ----------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`               | required                        | Discord bot token.                                                                                 |
+| `DISCORD_GUILD_ID`            | empty                           | Register commands in this guild instead of globally.                                               |
+| `MAINTAINERR_DISCORD_DB`      | `/data/bot.sqlite`              | SQLite file on persistent storage.                                                                 |
+| `LOG_LEVEL`                   | `debug`                         | `debug`, `info`, `warn`, `error`, or `silent`.                                                     |
+| `FEATURE_SMART_DECODER`       | `false`                         | Decode channel pastes in threads, add likely fixes and generated docs links in channels and DMs.   |
+| `FEATURE_SCREENSHOTS`         | `false`                         | Transcribe Test Media screenshots, then run the ordinary formatter.                                |
+| `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                         |
+| `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                         |
+| `FEATURE_TRIAGE`              | `false`                         | Try docs answering for question reports before collecting files. Requires support and reports.     |
+| `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                              |
+| `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                     |
+| `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                    |
+| `DISCORD_SUPPORT_CHANNEL_ID`  | empty                           | Opt into automatic answers in exactly this one channel. Requires support; empty means `/ask` only. |
+| `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                       |
+| `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                               |
+| `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                    |
+| `GITHUB_REPOSITORY`           | `Maintainerr/Maintainerr`       | Issue target as `owner/name`. Use a scratch repository for development.                            |
+| `LLM_BASE_URL`                | empty                           | OpenAI-compatible server URL, optionally ending in `/v1`. Empty means docs links only.             |
+| `LLM_API_KEY`                 | empty                           | Provider key if required. Secret.                                                                  |
+| `LLM_MODEL`                   | empty                           | Model identifier. Required when a provider URL is set.                                             |
+| `LLM_VISION`                  | `false`                         | Explicitly declare that the configured model accepts images.                                       |
+| `LLM_REQUESTS_PER_MINUTE`     | `1`                             | Serial token-bucket rate. Set below the provider's published limit.                                |
+| `LLM_DAILY_LIMIT`             | `100`                           | Maximum logical model requests per UTC day; retries share one unit. Persisted in SQLite.           |
+| `DOCS_REPOSITORY`             | `Maintainerr/Maintainerr_docs`  | Documentation source as `owner/name`.                                                              |
+| `DOCS_REF`                    | `main`                          | Documentation branch, tag, or commit. A refresh pins all files to one tree SHA.                    |
+| `DOCS_ORIGIN`                 | `https://docs.maintainerr.info` | Published docs origin used for citations.                                                          |
+| `ATTACHMENT_MAX_BYTES`        | `1048576`                       | Per-file cap for reports and screenshots. Reports allow at most ten files or pasted logs.          |
 
-The bot needs the `applications.commands` scope and, in the bot settings, the
-Guilds, Direct Messages, Guild Messages and Message Content intents. Enable the
-privileged Message Content intent in the Discord developer portal.
+Boolean flags accept `true`, `false`, `1`, and `0`. All feature flags are off by
+default. With just a token and writable storage, the bot preserves the original
+DM decoder and logs that support, reports and screenshot reading are disabled.
+It fetches documentation only when support or the smart decoder is enabled.
+
+The bot needs the `applications.commands` scope and the Guilds, Direct Messages,
+Guild Messages and Message Content intents. Enable the privileged Message Content
+intent in the Discord developer portal. Grant View Channel, Send Messages,
+Embed Links and Read Message History in the configured channels. Channel decoding
+also needs Create Public Threads and Send Messages in Threads. Report collection
+and GitHub state sync need Manage Threads and access to the configured forum.
+
+## Optional capabilities
+
+With `FEATURE_SMART_DECODER=true`, a recognized Test Media paste in a channel
+gets its own thread; ordinary conversation is ignored. Deterministic guidance
+covers empty watch dates, failed Radarr or Sonarr lookups, missing dates and
+missing comparison values. The formatter stays unchanged. Rule links are built
+from the headings, table labels and code identifiers in `Rules.mdx` at index time.
+If an exact field is absent from the docs, the closest generated section is used.
+
+With screenshots enabled, send an image in a DM, in the configured support
+channel, or with an explicit bot mention. Images in other channels are ignored.
+Image reading also needs `LLM_VISION=true` and a
+configured vision provider. Without those, the bot asks for the copied text.
+Malformed or incomplete model output also falls back to asking for text.
+
+With `FEATURE_SUPPORT=true`, `/ask question:...` returns the three closest docs
+sections. This mode works without a provider and should be observed before
+configuring one. Provider failure, quota exhaustion, or invalid citations fall
+back to docs links. The index refreshes at boot; a failed refresh keeps the last
+complete index. A fresh installation without an index asks for a maintainer if
+its first refresh fails. Questions have a 30 second per-user cooldown and each
+message is answered at most once. Auto answering is off until a support channel
+is explicitly configured. "This did not help" opens the report category selector
+when reports are enabled, otherwise it refers to a maintainer.
+
+With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher, collects
+a category and details, and creates a forum post immediately. The reporter can
+add raster images or small text logs, finish with Done or No files, edit, or
+cancel. Submissions are limited to three per hour with a 30 second cooldown.
+Unsupported files, oversized files and binary files disguised as text are rejected.
+Text is redacted before SQLite storage and again before GitHub publication.
+
+Without GitHub App credentials, reports stay in Discord. With credentials, a
+member with the staff role can open Staff actions and see an ephemeral Publish
+button. Discord cannot hide individual buttons by role in a shared message;
+both opening that private menu and publishing re-fetch and check the staff role.
+Nothing publishes automatically. The App needs Issues read/write and Metadata
+read permissions. No inbound port, webhook URL, webhook secret, or personal
+access token is used. Issues receive `source:discord` and their category label.
+Replies and state are synced every 60 seconds; labels map to matching forum tags.
+Files remain in Discord, with the issue linking back to the thread. Human replies
+reopen closed issues and archived threads. Idempotency markers and persisted job
+leases recover interrupted publication and relay operations.
+
+`FEATURE_TRIAGE=true` makes question reports try documentation first. A reporter
+can mark the question solved, in which case no issue is queued, or continue into
+file collection. Leave this flag disabled until docs answering has been observed
+on real questions for several weeks.
+
+Use a free-tier or self-hosted provider; no provider is selected by default.
+Text prompts are redacted and retrieval is limited to three short sections.
+Screenshot pixels cannot be text-redacted, so screenshot reading is separately
+opted into. Quotas and provider failures never disable the deterministic decoder.
 
 ## Running it
 
@@ -57,15 +145,16 @@ From source, with Node 26 or newer:
 ```
 yarn install
 cp .env.example .env   # then fill in DISCORD_TOKEN
-yarn start
+MAINTAINERR_DISCORD_DB=./data/bot.sqlite yarn start
 ```
 
 `yarn dev` runs the same thing under `node --watch`.
 
-The `/data` volume is required. SQLite stores pending jobs and reports in
-`/data/bot.sqlite`. Set `MAINTAINERR_DISCORD_DB=./data/bot.sqlite` when running from
-source if `/data` is not writable. Stop the bot before copying the database for
-backup so the WAL is checkpointed.
+The `/data` volume is required. SQLite stores reports, pending jobs and the docs
+index in `/data/bot.sqlite`; replacing a container without its volume loses them.
+`MAINTAINERR_DISCORD_DB` overrides the path. From source, set it to
+`./data/bot.sqlite` if `/data` is not writable. Stop the bot before copying the
+database for a backup, so the WAL has been checkpointed.
 
 ## Images
 
@@ -79,36 +168,27 @@ goes into it: no ENV secrets, no copied config, no `.env`. `DISCORD_TOKEN` is
 injected at runtime by whatever runs the container, and only `package.json`,
 `yarn.lock` and `src` are copied in.
 
+## Development and acceptance
+
+Run `yarn test` with Node 26. Tests use the standard library and fake services;
+they never write to the production tracker. `yarn format` runs pinned Prettier
+on demand with `npx`; it adds no runtime dependency. Prettier 3.6.2 is selected
+by the script, not pinned in yarn.lock. A cold cache needs npm registry access;
+offline formatting requires an already populated cache. Legacy formatter files and
+their existing tests are excluded from formatting to preserve their original
+content except for moved import paths. Pull requests run `node --test` and build
+and syntax-check the image. The Dependabot workflows are unchanged.
+
+Live integration requires the maintainer-owned setup from phase 0 of `PLAN.md`:
+a test guild, report channels and staff role, and a GitHub App installed on a
+scratch repository. Set `GITHUB_REPOSITORY` to that scratch repository before
+running integration checks. Do not test publication on `Maintainerr/Maintainerr`.
+Check the DM output against a saved payload, restart during collection and
+publication, race Publish, and verify that replies do not loop, closing archives
+the thread, replying reopens both sides, and unchanged polls return 304.
+`AUDIT.log` records implementation and validation, including outstanding live
+acceptance. No claim of production validation or multi-week observation is made.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## phase5 configuration
-
-Add opt-in smarter decoding, threaded channel pastes, deterministic hints, generated Rules.mdx anchors and scoped screenshot extraction. Shared docs/provider code supports decoder features; no /ask command or report intake is registered. Prompts redact prefixed env credentials; retries share one daily unit.
-
-Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
-
-## phase6 configuration
-
-Add feature-gated /ask, BM25 doc-link fallback, optional grounded completion, one opt-in support channel, user cooldowns and feedback escalation. Disabled /ask is removed without deleting unrelated commands.
-
-Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
-
-## phase3 configuration
-
-Add Discord-only report intake, persistent launcher and forum collection, reporter edits/cancel, three-per-hour limit, redaction before storage, and image/text allowlisting. GitHub publishing is unavailable in this phase.
-
-Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
-
-## phase4 configuration
-
-Add staff-gated GitHub App publication, marker recovery, leased workers, bidirectional comment sync, conditional polling, issue state/forum tags, and loop prevention. Tests use a fake Example/scratch repository only.
-
-Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
-
-## phase7 configuration
-
-Add FEATURE_TRIAGE, disabled by default. Questions try docs first; solved reports never queue issues. Live multi-week observation remains a maintainer prerequisite for enabling it.
-
-Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`

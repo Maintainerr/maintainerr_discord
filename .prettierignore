@@ -1,0 +1,6 @@
+# Preserve phase 1's unchanged legacy formatter and test files.
+src/capabilities/testmedia/formatter.js
+src/capabilities/testmedia/rule-definitions.js
+test/formatter.test.js
+test/rule-definitions.test.js
+test/helpers.js
