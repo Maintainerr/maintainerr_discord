@@ -94,3 +94,9 @@ Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD
 Add feature-gated /ask, BM25 doc-link fallback, optional grounded completion, one opt-in support channel, user cooldowns and feedback escalation. Disabled /ask is removed without deleting unrelated commands.
 
 Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
+
+## phase3 configuration
+
+Add Discord-only report intake, persistent launcher and forum collection, reporter edits/cancel, three-per-hour limit, redaction before storage, and image/text allowlisting. GitHub publishing is unavailable in this phase.
+
+Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
