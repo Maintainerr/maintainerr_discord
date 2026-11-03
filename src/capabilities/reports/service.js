@@ -3,10 +3,23 @@ import { redactSecrets, redactObject } from '../../lib/redaction.js'
 
 export class ReportError extends Error {}
 export const FIELD_LIMITS = {
+  title: 100,
   version: 150,
   server: 150,
   happened: 650,
   steps: 650,
+}
+
+function checkFields(clean) {
+  for (const key of Object.keys(FIELD_LIMITS))
+    if (
+      typeof clean[key] !== 'string' ||
+      !clean[key].trim() ||
+      clean[key].length > FIELD_LIMITS[key]
+    )
+      throw new ReportError(
+        'Complete every field. The title allows 100 characters, version and server details 150, and descriptions 650.'
+      )
 }
 
 export function createReportService(store, config) {
@@ -32,16 +45,7 @@ export function createReportService(store, config) {
       if (category !== 'bug')
         throw new ReportError('Only bug reports can be filed here.')
       const clean = redactObject(fields)
-      for (const key of Object.keys(FIELD_LIMITS)) {
-        if (
-          typeof clean[key] !== 'string' ||
-          !clean[key].trim() ||
-          clean[key].length > FIELD_LIMITS[key]
-        )
-          throw new ReportError(
-            'Complete every field. Version and server details allow 150 characters; descriptions allow 650.'
-          )
-      }
+      checkFields(clean)
       return store.transaction(() => {
         const recent = db
           .prepare(
@@ -64,7 +68,7 @@ export function createReportService(store, config) {
           reporterId,
           category,
           'collecting',
-          clean.happened.trim().slice(0, 90),
+          clean.title.trim(),
           JSON.stringify(clean),
           now,
           now
@@ -97,23 +101,10 @@ export function createReportService(store, config) {
       if (!['collecting', 'ready'].includes(report.state))
         throw new ReportError('This report can no longer be edited.')
       const clean = redactObject(fields)
-      for (const key of Object.keys(FIELD_LIMITS))
-        if (
-          typeof clean[key] !== 'string' ||
-          !clean[key].trim() ||
-          clean[key].length > FIELD_LIMITS[key]
-        )
-          throw new ReportError(
-            'Complete every field. Version and server details allow 150 characters; descriptions allow 650.'
-          )
+      checkFields(clean)
       db.prepare(
         'UPDATE reports SET fields = ?, title = ?, updated_at = ? WHERE id = ?'
-      ).run(
-        JSON.stringify(clean),
-        clean.happened.trim().slice(0, 90),
-        Date.now(),
-        id
-      )
+      ).run(JSON.stringify(clean), clean.title.trim(), Date.now(), id)
       return get(id)
     },
     cancel(id, userId) {

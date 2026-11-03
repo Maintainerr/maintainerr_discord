@@ -15,6 +15,7 @@ import {
 } from '../src/github/markers.js'
 
 const fields = {
+  title: 'Invented title',
   version: 'fake version',
   server: 'Plex',
   happened: 'Invented collection fails',

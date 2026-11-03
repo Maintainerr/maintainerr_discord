@@ -14,6 +14,7 @@ import {
 } from '../src/lib/attachments.js'
 
 const fields = {
+  title: 'Invented title',
   version: '3.0 container',
   server: 'Plex',
   happened: 'Invented collection does not match',
@@ -118,6 +119,8 @@ test('publishing requires staff and a completed collection, and queues only once
   t.after(() => store.close())
   const reports = createReportService(store, { githubEnabled: true })
   const report = reports.create(reportInput(0))
+  // The issue title comes from the Title field, not from What Happened.
+  assert.equal(report.title, 'Invented title')
   reports.attachThread(report.id, 'fake-thread', 'fake-control')
   assert.throws(
     () =>
@@ -157,7 +160,11 @@ test('only bugs open the report form; feature ideas and questions go elsewhere',
       customId: 'report:category',
       values: [value],
       isStringSelectMenu: () => true,
-      showModal: async (modal) => forms.push(modal.toJSON().custom_id),
+      showModal: async (modal) => {
+        const form = modal.toJSON()
+        forms.push(form.custom_id)
+        assert.equal(form.components[0].components[0].custom_id, 'title')
+      },
       update: async (message) => replies.push(message.content),
     })
   // The Report a Bug button offered under an unhelpful answer skips the menu.
