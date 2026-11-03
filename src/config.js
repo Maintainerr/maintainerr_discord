@@ -17,6 +17,7 @@ export function readConfig(env = process.env) {
   }
   const errors = []
   for (const [key, variable] of Object.entries({
+    featureSupport: 'FEATURE_SUPPORT',
     featureSmartDecoder: 'FEATURE_SMART_DECODER',
     featureScreenshots: 'FEATURE_SCREENSHOTS',
     llmVision: 'LLM_VISION',

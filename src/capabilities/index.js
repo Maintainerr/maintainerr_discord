@@ -1,2 +1,3 @@
 import testmedia from './testmedia/index.js'
-export default [testmedia]
+import support from './support/index.js'
+export default [testmedia, support]
