@@ -205,7 +205,7 @@ export function createDocsIndex(store) {
 
 // API reference pages are written for integrators. They outrank the user docs
 // on keywords and are never the right answer to a support question.
-const SKIPPED_DOCS = ['docs/api/']
+const SKIPPED_DOCS = ['docs/api/', 'docs/API.md']
 
 export async function refreshDocs(index, config, fetchFn = fetch) {
   const response = await fetchFn(

@@ -139,6 +139,7 @@ test('API reference pages are not indexed, and changing that rule forces a reind
         tree: [
           { type: 'blob', path: 'docs/Rules.mdx' },
           { type: 'blob', path: 'docs/api/rules.md' },
+          { type: 'blob', path: 'docs/API.md' },
         ],
       })
     downloads.push(url.split('/').at(-1))

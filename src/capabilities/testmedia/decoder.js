@@ -2,7 +2,7 @@ import { MessageFlags } from 'discord.js'
 import { parse as parseYaml } from 'yaml'
 import { formatMaintainerrResult } from './formatter.js'
 import { buildResultEmbeds } from './embeds.js'
-import { describeError } from '../../lib/logging.js'
+import { describeError, where } from '../../lib/logging.js'
 import { suggestFixes, ruleFields, payloadItems } from './hints.js'
 import { safeMessage } from '../../lib/http.js'
 import {
@@ -87,11 +87,7 @@ export function findPaste(message, ctx) {
 }
 
 export async function handleBotCommand(interaction, { logger }) {
-  logger.debug(
-    `[slash] /testmedia used by ${interaction.user.tag} in ${
-      interaction.guild?.name ?? 'DM'
-    }`
-  )
+  logger.debug(`[testmedia] ${interaction.user.tag} in ${where(interaction)}`)
   // Defer before the two DM requests can exhaust the 3 second reply window.
   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral })
