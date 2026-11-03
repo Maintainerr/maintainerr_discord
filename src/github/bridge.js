@@ -8,21 +8,15 @@ import { redactSecrets } from '../lib/redaction.js'
 import { describeError } from '../lib/logging.js'
 import { MAX_JOB_ATTEMPTS } from '../db.js'
 
-const categoryLabel = {
-  bug: 'bug',
-  feature: 'enhancement',
-  question: 'question',
-}
-
 export function issueBody(report, attachments) {
   const fields = JSON.parse(report.fields)
   return `${reportMarker(report.id)}\n${redactSecrets(
     [
-      `## Discord Report: ${report.category}`,
+      '## Bug Report from Discord',
       `**Version and Install Method**\n${fields.version}`,
       `**Media Server**\n${fields.server}`,
-      `**What Happened or Requested Behavior**\n${fields.happened}`,
-      `**Steps or Use Case**\n${fields.steps}`,
+      `**What Happened**\n${fields.happened}`,
+      `**Steps to Reproduce**\n${fields.steps}`,
       ...attachments.map((file) =>
         file.content
           ? `**${file.filename}**\n\n\`\`\`text\n${file.content.slice(0, 3000).replaceAll('```', "'''")}\n\`\`\``
@@ -132,7 +126,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
                   .prepare('SELECT * FROM attachments WHERE report_id = ?')
                   .all(report.id)
               ),
-              labels: ['source:discord', categoryLabel[report.category]],
+              labels: ['source:discord', 'bug'],
             })
           ).data
         }

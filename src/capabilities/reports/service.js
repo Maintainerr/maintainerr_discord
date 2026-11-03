@@ -25,12 +25,12 @@ export function createReportService(store, config) {
     pending: () =>
       db
         .prepare(
-          "SELECT * FROM reports WHERE state IN ('collecting', 'triage', 'ready', 'publishing')"
+          "SELECT * FROM reports WHERE state IN ('collecting', 'ready', 'publishing')"
         )
         .all(),
     create({ guildId, reporterId, category, fields, now = Date.now() }) {
-      if (!['bug', 'feature', 'question'].includes(category))
-        throw new ReportError('Choose a valid report category.')
+      if (category !== 'bug')
+        throw new ReportError('Only bug reports can be filed here.')
       const clean = redactObject(fields)
       for (const key of Object.keys(FIELD_LIMITS)) {
         if (
@@ -55,10 +55,6 @@ export function createReportService(store, config) {
         if (recent.latest !== null && recent.latest > now - 30000)
           throw new ReportError('Please wait 30 seconds between reports.')
         const id = randomUUID()
-        const state =
-          category === 'question' && config.featureTriage
-            ? 'triage'
-            : 'collecting'
         db.prepare(
           `INSERT INTO reports (id, guild_id, reporter_id, category, state, title, fields, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -67,7 +63,7 @@ export function createReportService(store, config) {
           guildId,
           reporterId,
           category,
-          state,
+          'collecting',
           clean.happened.trim().slice(0, 90),
           JSON.stringify(clean),
           now,
@@ -96,21 +92,9 @@ export function createReportService(store, config) {
         throw new ReportError('This report is not collecting files.')
       return get(id)
     },
-    triage(id, userId, resolved) {
-      own(id, userId)
-      if (
-        !db
-          .prepare(
-            "UPDATE reports SET state = ?, updated_at = ? WHERE id = ? AND state = 'triage'"
-          )
-          .run(resolved ? 'resolved' : 'collecting', Date.now(), id).changes
-      )
-        throw new ReportError('This report is no longer awaiting your answer.')
-      return get(id)
-    },
     edit(id, userId, fields) {
       const report = own(id, userId)
-      if (!['collecting', 'triage', 'ready'].includes(report.state))
+      if (!['collecting', 'ready'].includes(report.state))
         throw new ReportError('This report can no longer be edited.')
       const clean = redactObject(fields)
       for (const key of Object.keys(FIELD_LIMITS))
@@ -134,7 +118,7 @@ export function createReportService(store, config) {
     },
     cancel(id, userId) {
       const report = own(id, userId)
-      if (!['collecting', 'triage', 'ready'].includes(report.state))
+      if (!['collecting', 'ready'].includes(report.state))
         throw new ReportError('This report can no longer be cancelled.')
       db.prepare(
         "UPDATE reports SET state = 'cancelled', updated_at = ? WHERE id = ?"

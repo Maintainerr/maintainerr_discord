@@ -33,7 +33,6 @@ export function readConfig(env = process.env) {
     featureSupport: 'FEATURE_SUPPORT',
     featureSmartDecoder: 'FEATURE_SMART_DECODER',
     featureScreenshots: 'FEATURE_SCREENSHOTS',
-    featureTriage: 'FEATURE_TRIAGE',
     featureWelcome: 'FEATURE_WELCOME',
     llmVision: 'LLM_VISION',
   })) {
@@ -154,12 +153,6 @@ export function readConfig(env = process.env) {
   }
   if (config.llmBaseUrl && !config.llmModel)
     errors.push('LLM_MODEL is required when LLM_BASE_URL is set.')
-  if (
-    config.featureTriage &&
-    (!config.featureReports || !config.featureSupport)
-  ) {
-    errors.push('FEATURE_TRIAGE requires FEATURE_REPORTS and FEATURE_SUPPORT.')
-  }
 
   return { config, errors }
 }

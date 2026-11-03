@@ -5,11 +5,13 @@ import { describeError } from '../../lib/logging.js'
 export const GUIDE_URL =
   'https://github.com/Maintainerr/maintainerr_discord#using-it'
 
+export const supportChannels = (config) =>
+  config.supportChannelIds.map((id) => `<#${id}>`).join(' or ')
+
 export function supportLines(config) {
   if (!config.supportChannelIds.length) return []
-  const help = config.supportChannelIds.map((id) => `<#${id}>`).join(' or ')
   return [
-    `- Ask for help in ${help}. Search there first, since your question may already be answered.`,
+    `- Ask for help in ${supportChannels(config)}. Search there first, since your question may already be answered.`,
     '- Paste your Test Media output in a post to have it explained.',
   ]
 }

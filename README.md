@@ -26,6 +26,10 @@ Anywhere in the server:
 - `/delete` explains when Maintainerr takes action on your media. The answer is
   public, so you can post it in someone's thread.
 
+To report a bug, press **Report a Bug** in the bug report channel. A maintainer
+reviews each report before it goes to GitHub. Feature ideas go to
+https://features.maintainerr.info/.
+
 To get your Test Media output:
 
 1. On the Collections tab, open the collection in question.
@@ -51,7 +55,6 @@ are reported together and do not print supplied values.
 | `FEATURE_SCREENSHOTS`         | `false`                         | Transcribe Test Media screenshots, then run the ordinary formatter.                                                                 |
 | `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                                                          |
 | `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                                                          |
-| `FEATURE_TRIAGE`              | `false`                         | Try docs answering for question reports before collecting files. Requires support and reports.                                      |
 | `FEATURE_WELCOME`             | `false`                         | Greet new members. Needs the privileged Server Members Intent.                                                                      |
 | `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                               |
 | `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                      |
@@ -110,11 +113,13 @@ complete index. A fresh installation without an index asks for a maintainer if
 its first refresh fails. Questions have a 30 second per-user cooldown and each
 message is answered at most once. Auto answering is off until support channels
 are configured. In a forum, the bot answers each post's opening message once and
-leaves the replies in that post alone. "This Did Not Help" opens the report category selector
-when reports are enabled, otherwise it refers to a maintainer.
+leaves the replies in that post alone. "This Did Not Help" thanks the member and
+asks them to add details where they asked.
 
-With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher, collects
-a category and details, and creates a forum post immediately. The reporter can
+With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher that asks
+what the report is about. Only bugs become reports: a feature idea is sent to
+https://features.maintainerr.info/, and a question to the support forums and
+`/ask`. A bug opens the report form and creates a forum post immediately. The reporter can
 add raster images or small text logs, finish with Done or No Files, edit, or
 cancel. Submissions are limited to three per hour with a 30 second cooldown.
 Unsupported files, oversized files and binary files disguised as text are rejected.
@@ -126,7 +131,7 @@ button. Discord cannot hide individual buttons by role in a shared message;
 both opening that private menu and publishing re-fetch and check the staff role.
 Nothing publishes automatically. The App needs Issues read/write and Metadata
 read permissions. No inbound port, webhook URL, webhook secret, or personal
-access token is used. Issues receive `source:discord` and their category label.
+access token is used. Issues receive the `bug` and `source:discord` labels.
 Replies and state are synced every 60 seconds; labels map to matching forum tags.
 Files remain in Discord, with the issue linking back to the thread. Human replies
 reopen closed issues and archived threads. Idempotency markers and persisted job
@@ -135,11 +140,6 @@ leases recover interrupted publication and relay operations.
 GitHub history is bound to its original repository. Changing the target, or
 finding old history without a binding, disables sync. Keep scratch and production
 databases separate.
-
-`FEATURE_TRIAGE=true` makes question reports try documentation first. A reporter
-can mark the question solved, in which case no issue is queued, or continue into
-file collection. Leave this flag disabled until docs answering has been observed
-on real questions for several weeks.
 
 Use a free-tier or self-hosted provider; no provider is selected by default.
 Text prompts are redacted and retrieval is limited to three short sections.

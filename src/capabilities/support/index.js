@@ -49,14 +49,12 @@ export default {
       )
         return
       ctx.logger.debug(`[unhelpful] ${interaction.user.tag}`)
-      if (ctx.reports) await ctx.reports.begin(interaction)
-      else
-        await interaction.reply({
-          ...safeMessage(
-            'Thanks for letting us know. Add more details here and a maintainer will take a look.'
-          ),
-          flags: MessageFlags.Ephemeral,
-        })
+      await interaction.reply({
+        ...safeMessage(
+          'Thanks for letting us know. Add more details here and a maintainer will take a look.'
+        ),
+        flags: MessageFlags.Ephemeral,
+      })
     })
   },
 }
