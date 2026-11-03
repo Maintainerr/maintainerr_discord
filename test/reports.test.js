@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { ChannelType, Collection } from 'discord.js'
 import { openDatabase } from '../src/db.js'
 import { createReportService } from '../src/capabilities/reports/service.js'
 import { createReportDiscord } from '../src/capabilities/reports/discord.js'
@@ -177,6 +178,47 @@ test('only bugs open the report form; feature ideas and questions go elsewhere',
       }),
     /bug/
   )
+})
+
+test('the launcher posts its embed without suppressing it', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  let sent
+  const channels = new Map([
+    ['forum', { id: 'forum', type: ChannelType.GuildForum, guildId: 'guild' }],
+    [
+      'launcher',
+      {
+        guildId: 'guild',
+        isTextBased: () => true,
+        messages: { fetch: async () => new Collection() },
+        send: async (payload) => {
+          sent = payload
+          return { id: 'launcher-message' }
+        },
+      },
+    ],
+  ])
+  await createReportDiscord(
+    {
+      user: { id: 'bot' },
+      channels: { fetch: async (id) => channels.get(id) },
+    },
+    {
+      config: {
+        forumChannelId: 'forum',
+        launcherChannelId: 'launcher',
+        supportChannelIds: ['support-forum'],
+      },
+      store,
+      logger: { debug() {}, warn() {} },
+    }
+  ).ready()
+  assert.equal(sent.flags, 0)
+  assert.deepEqual(sent.allowedMentions, { parse: [] })
+  const embed = sent.embeds[0].toJSON()
+  assert.equal(embed.title, 'Report a Bug')
+  assert.ok(embed.fields.some((field) => field.value.includes('<#forum>')))
 })
 
 test('attachment allowlist rejects size, executables and disguised binary files', async () => {
