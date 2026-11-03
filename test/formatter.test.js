@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { formatMaintainerrResult, splitMessage } from '../src/formatter.js'
+import { formatMaintainerrResult, splitMessage } from '../src/capabilities/testmedia/formatter.js'
 import { rule, section, item, payload, formatOneRule } from './helpers.js'
 
 const one = (overrides) => formatOneRule(formatMaintainerrResult, overrides)
