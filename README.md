@@ -106,3 +106,9 @@ Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_L
 Add staff-gated GitHub App publication, marker recovery, leased workers, bidirectional comment sync, conditional polling, issue state/forum tags, and loop prevention. Tests use a fake Example/scratch repository only.
 
 Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
+
+## phase7 configuration
+
+Add FEATURE_TRIAGE, disabled by default. Questions try docs first; solved reports never queue issues. Live multi-week observation remains a maintainer prerequisite for enabling it.
+
+Additional variables: `DISCORD_FORUM_CHANNEL_ID`, `DISCORD_GUILD_ID`, `DISCORD_LAUNCHER_CHANNEL_ID`, `DISCORD_STAFF_ROLE_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`

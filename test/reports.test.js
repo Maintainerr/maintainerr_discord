@@ -139,6 +139,36 @@ test('publishing requires staff and a completed collection, and queues only once
   assert.throws(() => reports.edit(report.id, 'fake-user', fields), /no longer/)
 })
 
+test('resolved triage never queues an issue and unresolved triage collects files', (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const reports = createReportService(store, {
+    featureTriage: true,
+    githubEnabled: true,
+  })
+  const report = reports.create({ ...reportInput(0), category: 'question' })
+  assert.equal(report.state, 'triage')
+  reports.triage(report.id, 'fake-user', true)
+  assert.equal(reports.get(report.id).state, 'resolved')
+  assert.throws(
+    () =>
+      reports.requestPublish(report.id, { staff: true, guildId: 'fake-guild' }),
+    /finish/
+  )
+  assert.equal(
+    store.db.prepare('SELECT count(*) AS count FROM jobs').get().count,
+    0
+  )
+  const another = reports.create({
+    ...reportInput(30000),
+    category: 'question',
+  })
+  assert.equal(
+    reports.triage(another.id, 'fake-user', false).state,
+    'collecting'
+  )
+})
+
 test('attachment allowlist rejects size, executables and disguised binary files', async () => {
   assert.match(
     classifyAttachment(

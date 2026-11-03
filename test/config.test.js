@@ -8,6 +8,14 @@ test('only the Discord token is required and logging defaults to debug', () => {
   assert.equal(config.discordToken, 'fake-token')
   assert.equal(config.discordGuildId, null)
   assert.equal(config.logLevel, 'debug')
+  for (const key of [
+    'featureReports',
+    'featureSupport',
+    'featureSmartDecoder',
+    'featureScreenshots',
+    'featureTriage',
+  ])
+    assert.equal(config[key], false)
 })
 
 test('configuration reports all errors without echoing invalid values', () => {

@@ -55,7 +55,10 @@ export function createReportService(store, config) {
         if (recent.latest !== null && recent.latest > now - 30000)
           throw new ReportError('Please wait 30 seconds between reports.')
         const id = randomUUID()
-        const state = 'collecting'
+        const state =
+          category === 'question' && config.featureTriage
+            ? 'triage'
+            : 'collecting'
         db.prepare(
           `INSERT INTO reports (id, guild_id, reporter_id, category, state, title, fields, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -91,6 +94,18 @@ export function createReportService(store, config) {
           .run(Date.now(), id).changes
       )
         throw new ReportError('This report is not collecting files.')
+      return get(id)
+    },
+    triage(id, userId, resolved) {
+      own(id, userId)
+      if (
+        !db
+          .prepare(
+            "UPDATE reports SET state = ?, updated_at = ? WHERE id = ? AND state = 'triage'"
+          )
+          .run(resolved ? 'resolved' : 'collecting', Date.now(), id).changes
+      )
+        throw new ReportError('This report is no longer awaiting your answer.')
       return get(id)
     },
     edit(id, userId, fields) {
