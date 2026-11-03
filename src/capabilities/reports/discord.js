@@ -8,6 +8,7 @@ import {
   TextInputStyle,
   MessageFlags,
   ChannelType,
+  EmbedBuilder,
 } from 'discord.js'
 import { createReportService, ReportError, FIELD_LIMITS } from './service.js'
 import { safeMessage } from '../../lib/http.js'
@@ -224,10 +225,35 @@ export function createReportDiscord(client, ctx) {
         before = messages.last().id
       }
     }
+    // Not safeMessage: suppressing embeds would hide this one. Editing also
+    // clears the flag on a launcher posted as plain text.
     const payload = {
-      ...safeMessage(
-        `**Report a Bug**\nA maintainer reviews each bug report before it is published on GitHub. Reports are public, so leave out passwords and API keys.\nSuggest features at ${FEATURES_URL}. For help with your setup, use the support forums.`
-      ),
+      content: '',
+      flags: 0,
+      allowedMentions: { parse: [] },
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xe03131)
+          .setTitle('Report a Bug')
+          .setDescription(
+            'Found a bug in Maintainerr? Use the button below to report it.'
+          )
+          .addFields(
+            {
+              name: 'What Happens Next',
+              value:
+                'Describe the bug and add screenshots or plain-text logs if you have them. A maintainer reviews every report before it goes to GitHub.',
+            },
+            {
+              name: 'Before You Submit',
+              value: `Reports, replies and attached files are public in <#${forum.id}> and on GitHub. Do not include passwords or API keys.`,
+            },
+            {
+              name: 'Not a Bug?',
+              value: `Suggest features at ${FEATURES_URL}. For help with your setup, ask in ${supportChannels(ctx.config) || 'the support forums'}.`,
+            }
+          ),
+      ],
       components: [
         row(button('report:start', 'Report a Bug', ButtonStyle.Primary)),
       ],
