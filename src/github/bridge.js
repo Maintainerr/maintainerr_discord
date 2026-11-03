@@ -34,6 +34,7 @@ export function issueBody(report, attachments) {
 }
 
 export function createBridge({ store, github, relay, logger, now = Date.now }) {
+  const { db } = store
   // Our own bot user id, learned from the first issue or comment we write, so a
   // different app on the repository cannot claim one of our markers.
   let botId
@@ -42,22 +43,32 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       botId = Number(store.getCursor('github:bot')?.cursor) || null
     return botId
   }
-  // Issue numbers, poll cursors and sync rows are all repository-relative. If the
-  // configured repository changes while /data survives, stored mappings would act
-  // on same-numbered issues in the new one, so refuse rather than guess.
+  // Repository-relative history cannot safely be reassigned to a different target.
   let mismatchLogged = false
   const repositoryChanged = () => {
-    const stored = store.getCursor('github:repository')?.cursor
-    if (!stored) {
-      store.setCursor('github:repository', github.root, null, now())
-      return false
-    }
-    if (stored === github.root) return false
+    const root = github.root.toLowerCase()
+    const stored = store.transaction(() => {
+      const previous = store.getCursor('github:repository')?.cursor
+      if (previous) return previous.toLowerCase()
+      const history = db
+        .prepare(
+          `SELECT
+        EXISTS(SELECT 1 FROM reports WHERE issue_number IS NOT NULL) OR
+        EXISTS(SELECT 1 FROM jobs WHERE kind IN ('publish', 'comment') AND attempts > 0) OR
+        EXISTS(SELECT 1 FROM sync) OR
+        EXISTS(SELECT 1 FROM poll_cursor WHERE key LIKE 'github:%') AS found`
+        )
+        .get().found
+      if (history) return null
+      store.setCursor('github:repository', root, null, now())
+      return root
+    })
+    if (stored === root) return false
     if (!mismatchLogged) {
       mismatchLogged = true
       logger.warn(
-        `GitHub sync is disabled: stored reports belong to ${stored} but GITHUB_REPOSITORY is now ${github.root}. ` +
-          'Point it back, or start from an empty database.'
+        `GitHub sync is disabled: stored history belongs to ${stored ?? 'an unknown repository'}, not ${github.root}. ` +
+          'Restore the original repository binding or use a fresh database.'
       )
     }
     return true
@@ -68,7 +79,6 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
     botId = item.user.id
     store.setCursor('github:bot', String(botId), null, now())
   }
-  const { db } = store
   let timer
   let active
   let nextPoll = 0
@@ -178,9 +188,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       if (response.status === 304) return
       const issues = [...response.data]
       if (response.next) issues.push(...(await github.list(response.next)))
-      // Earliest issue skipped for a reason that may clear. The window must not
-      // move past it, or its updates are never read again.
-      let retryFrom = null
+      let retry = false
       for (const issue of issues) {
         const report = db
           .prepare('SELECT * FROM reports WHERE issue_number = ?')
@@ -195,15 +203,12 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           await relay.issueState(report, issue)
         } catch (err) {
           if (![10003, 50001, 50013].includes(err.code)) throw err
-          if (err.code === 10003)
+          if (err.code === 10003) {
             store.setCursor(
               `discord:deleted-thread:${report.thread_id}`,
               'true'
             )
-          // One unavailable thread must not stop synchronization of other
-          // reports, but the window has to wait for it.
-          if (!retryFrom || issue.updated_at < retryFrom)
-            retryFrom = issue.updated_at
+          } else retry = true
           continue
         }
         const previous = store.getCursor(`github:comments:${issue.number}`)
@@ -245,15 +250,15 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           issue.updated_at > latest ? issue.updated_at : latest,
         since
       )
-      const reached = retryFrom && retryFrom < watermark ? retryFrom : watermark
       const advanced =
-        issues.length >= 100 && reached > since
-          ? new Date(Date.parse(reached) - 1000).toISOString()
+        !retry && issues.length >= 100 && watermark > since
+          ? new Date(Date.parse(watermark) - 1000).toISOString()
           : since
+      // A 304 would hide undelivered updates even after Discord access recovers.
       store.setCursor(
         'github:issues',
         advanced,
-        advanced === since ? response.etag : null
+        !retry && advanced === since ? response.etag : null
       )
     },
     async runJobs() {

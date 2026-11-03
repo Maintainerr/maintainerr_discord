@@ -113,6 +113,10 @@ Files remain in Discord, with the issue linking back to the thread. Human replie
 reopen closed issues and archived threads. Idempotency markers and persisted job
 leases recover interrupted publication and relay operations.
 
+GitHub history is bound to its original repository. Changing the target, or
+finding old history without a binding, disables sync. Keep scratch and production
+databases separate.
+
 `FEATURE_TRIAGE=true` makes question reports try documentation first. A reporter
 can mark the question solved, in which case no issue is queued, or continue into
 file collection. Leave this flag disabled until docs answering has been observed

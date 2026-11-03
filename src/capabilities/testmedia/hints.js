@@ -18,13 +18,10 @@ export function suggestFixes(payload) {
   for (const item of payloadItems(payload)) {
     for (const section of item.sectionResults ?? []) {
       for (const rule of section.ruleResults ?? []) {
-        // An exists or not_exists rule is meant to see a missing value, so no
-        // branch below should offer it missing-value guidance.
-        const comparison = !UNARY_ACTIONS.has(rule.action)
+        if (UNARY_ACTIONS.has(rule.action)) continue
         const firstMissing = missing(rule.firstValue)
-        const secondMissing = comparison && missing(rule.secondValue)
+        const secondMissing = missing(rule.secondValue)
         if (
-          comparison &&
           firstMissing &&
           String(rule.firstValueName ?? '')
             .toLowerCase()
@@ -34,7 +31,6 @@ export function suggestFixes(payload) {
             'An empty sw_lastWatched can mean nobody has watched this show. Add a separate rule for never-watched media instead of comparing an empty watch date.'
           )
         } else if (
-          comparison &&
           [
             ['first', firstMissing],
             ['second', secondMissing],
@@ -55,10 +51,7 @@ export function suggestFixes(payload) {
           fixes.add(
             'This date rule has no date to compare. Check whether the source supplies that date, and handle missing dates with an exists or not_exists rule.'
           )
-        } else if (
-          (firstMissing || secondMissing) &&
-          !UNARY_ACTIONS.has(rule.action)
-        ) {
+        } else if (firstMissing || secondMissing) {
           fixes.add(
             'A comparison operand is missing. Check the source field and use an exists or not_exists rule to handle missing values explicitly.'
           )

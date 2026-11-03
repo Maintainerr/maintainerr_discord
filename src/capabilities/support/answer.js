@@ -3,9 +3,7 @@ import { describeError } from '../../lib/logging.js'
 
 const URLS = /https?:\/\/[^\s)\]>]+/g
 
-// Rename the product in prose only. Documentation keeps legacy routes, so a
-// cited URL containing /overseerr/ is a real address and rewriting it breaks
-// the citation it was validated against.
+// Published routes can retain legacy product names.
 function useSeerrName(value) {
   let out = ''
   let last = 0
@@ -19,6 +17,8 @@ function useSeerrName(value) {
   return out + value.slice(last).replace(/Overseerr|Jellyseerr/gi, 'Seerr')
 }
 
+const formatAnswer = (text) => useSeerrName(redactSecrets(text)).slice(0, 1800)
+
 export function createAnswerer({ docs, provider, logger }) {
   return async function answer(question) {
     const clean = redactSecrets(question).slice(0, 6000)
@@ -29,7 +29,7 @@ export function createAnswerer({ docs, provider, logger }) {
     const fallback = sections.length
       ? `Here are the closest documentation sections:\n${links.join('\n')}\n\nIf these do not answer your question, ask a maintainer.`
       : 'The documentation does not cover that question clearly. Please ask a maintainer.'
-    let text = fallback
+    let text = formatAnswer(fallback)
     if (provider && sections.length) {
       try {
         const response = await provider.complete({
@@ -45,9 +45,7 @@ export function createAnswerer({ docs, provider, logger }) {
             })),
           }),
         })
-        // Shorten before validating: a citation that passes the check but falls
-        // outside the length cap would be published with no source at all.
-        const body = useSeerrName(redactSecrets(response)).slice(0, 1800)
+        const body = formatAnswer(response)
         const cited = body.match(URLS) ?? []
         const allowed = new Set(sections.map((section) => section.url))
         if (cited.length && cited.every((url) => allowed.has(url))) text = body
@@ -55,6 +53,6 @@ export function createAnswerer({ docs, provider, logger }) {
         logger.debug('Using documentation fallback:', describeError(err))
       }
     }
-    return `**Maintainerr Support Bot**\n${useSeerrName(redactSecrets(text)).slice(0, 1800)}`
+    return `**Maintainerr Support Bot**\n${text}`
   }
 }

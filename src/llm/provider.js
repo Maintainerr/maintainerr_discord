@@ -11,8 +11,6 @@ export class RequestQueue {
     this.now = now
     this.wait = wait
     this.tail = Promise.resolve()
-    // A 429 is a statement about the credentials, not about one request, so the
-    // cooldown holds every queued question rather than only the one that got it.
     this.until = 0
   }
 
@@ -76,7 +74,7 @@ export function createProvider(
       if (!store.consumeDaily('llm:daily', config.llmDailyLimit, now()))
         throw new Error('Daily model quota reached.')
       for (let attempt = 0; attempt < 4; attempt += 1) {
-        let cooldown = 0
+        let retryAt = 0
         const response = await requests.run(
           async () => {
             const content = images.length
@@ -108,30 +106,27 @@ export function createProvider(
                 ],
               }),
             })
-            // Held here, inside the queued slot: setting it after run() returns
-            // lets the next queued request read the old value and send anyway.
+            // Set the shared cooldown before another queued request can start.
             if (sent.status === 429) {
-              cooldown = Math.max(
-                1000,
-                retryAfterMs(sent.headers, now()) ?? 1000 * 2 ** attempt
-              )
-              requests.pauseUntil?.(now() + cooldown)
+              retryAt =
+                now() +
+                Math.max(
+                  1000,
+                  retryAfterMs(sent.headers, now()) ?? 1000 * 2 ** attempt
+                )
+              requests.pauseUntil?.(retryAt)
             }
             return sent
           },
           { deadline }
         )
         if (response.status === 429 && attempt < 3) {
-          const delay = cooldown
           await response.body?.cancel()
-          if (now() + delay > deadline)
+          if (retryAt > deadline)
             throw new Error(
               'Model provider is rate limited beyond the response window.'
             )
-          // Hold the shared queue too: the limit applies to the credentials, so
-          // other queued questions must not keep sending during the cooldown.
-          requests.pauseUntil?.(now() + delay)
-          await wait(delay)
+          await wait(Math.max(0, retryAt - now()))
           continue
         }
         if (!response.ok) {

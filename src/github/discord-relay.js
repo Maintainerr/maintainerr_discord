@@ -31,8 +31,6 @@ export function createDiscordRelay(client, ctx) {
           if (messages.size < 100) break
           before = messages.last().id
         }
-        // Resolved only once the marker search has proved nothing was posted, so
-        // a caller may pass a thunk for work that costs money to produce.
         const body = typeof content === 'function' ? await content() : content
         return (await thread.send(safeMessage(`${body}\n${marker}`, roles))).id
       })()

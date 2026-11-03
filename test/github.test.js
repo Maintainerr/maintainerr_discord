@@ -98,7 +98,6 @@ function setup(t) {
     requests,
     relayed,
     relay,
-    github,
     change: () => {
       etag = '"two"'
     },
@@ -490,7 +489,9 @@ test('a failure notice keeps its launcher destination across permission recovery
 })
 
 test('an unavailable Discord thread does not block polling other reports', async (t) => {
-  for (const code of [10003, 50001, 50013]) {
+  for (const [code, size] of [10003, 50001, 50013].flatMap((code) =>
+    [2, 100].map((size) => [code, size])
+  )) {
     const env = setup(t)
     const other = env.reports.create({
       guildId: 'scratch-guild',
@@ -502,41 +503,66 @@ test('an unavailable Discord thread does not block polling other reports', async
     env.reports.attachThread(other.id, 'other-thread', 'other-control')
     env.reports.finish(other.id, 'another-user')
     for (const id of [env.report.id, other.id])
-      env.reports.requestPublish(id, { staff: true, guildId: 'scratch-guild' })
+      env.reports.requestPublish(id, {
+        staff: true,
+        guildId: 'scratch-guild',
+      })
     const bridge = env.bridge()
     await bridge.runJobs()
+    env.store.setCursor('github:issues', '2026-11-02T11:59:00.000Z')
+    env.issues[1].updated_at = '2026-11-02T12:05:00Z'
+    for (let number = 3; number <= size; number += 1)
+      env.issues.push({ number, updated_at: '2026-11-02T12:10:00Z' })
+    env.github.request = async (method, path, body, options) => {
+      if (options?.etag === 'unchanged') return { status: 304 }
+      const since = new URL(`https://api.example.test${path}`).searchParams.get(
+        'since'
+      )
+      return {
+        status: 200,
+        etag: 'unchanged',
+        data: env.issues.filter(
+          (issue) => Date.parse(issue.updated_at) > Date.parse(since)
+        ),
+      }
+    }
+    const comment = {
+      id: 123,
+      body: 'Recovered reply',
+      user: { type: 'User', login: 'reporter' },
+      created_at: '2026-11-02T12:00:01Z',
+    }
+    env.github.list = async (path) =>
+      path.includes('/issues/1/comments') ? [comment] : []
+    let inaccessible = true
     const states = []
     env.relay.issueState = async (report, issue) => {
-      if (report.id === env.report.id)
+      if (report.id === env.report.id && inaccessible)
         throw Object.assign(new Error('Thread unavailable'), { code })
-      states.push(issue.state)
+      states.push([report.id, issue.state])
     }
     env.issues[1].state = 'closed'
     await bridge.poll()
-    assert.deepEqual(states, ['closed'])
+    assert.deepEqual(states, [[other.id, 'closed']])
     if (code === 10003) {
       assert.ok(env.store.getCursor('discord:deleted-thread:fake-thread'))
+      if (size === 100)
+        assert.ok(
+          env.store.getCursor('github:issues').cursor > env.issues[0].updated_at
+        )
       continue
     }
-    // A full page advances the window. A report skipped for a reason that may
-    // clear must hold it back, or its updates are never read again.
-    const skipped = new Date(Date.now() + 120000).toISOString()
-    const newer = new Date(Date.now() + 420000).toISOString()
-    env.issues[0].updated_at = skipped
-    for (let n = 3; n <= 101; n += 1)
-      env.issues.push({
-        number: n,
-        state: 'open',
-        updated_at: newer,
-        labels: [],
-      })
-    env.change()
-    await bridge.poll()
-    const cursor = env.store.getCursor('github:issues')?.cursor
-    assert.ok(
-      !cursor || cursor < skipped,
-      `window advanced to ${cursor}, past the skipped report`
+    assert.equal(env.store.getCursor('github:issues').etag, null)
+    await env.bridge().poll()
+    inaccessible = false
+    await env.bridge().poll()
+    assert.equal(states.filter(([id]) => id === env.report.id).length, 1)
+    assert.deepEqual(
+      env.relayed.filter(([kind]) => kind === 'comment'),
+      [['comment', 123]]
     )
+    await env.bridge().poll()
+    assert.equal(env.relayed.filter(([kind]) => kind === 'comment').length, 1)
   }
 })
 
@@ -548,13 +574,30 @@ test('a changed repository stops the bridge reusing stored issue numbers', async
   })
   await env.bridge().runJobs()
   assert.equal(env.issues.length, 1)
+  const jobId = env.store.enqueue(
+    'comment',
+    {
+      reportId: env.report.id,
+      messageId: 10,
+      author: 'reporter',
+      body: 'Queued reply',
+    },
+    { dedupeKey: 'queued-reply', now: 0 }
+  )
   const before = env.requests.length
 
   // Same /data, different GITHUB_REPOSITORY: issue 1 here is a different issue.
   env.github.root = '/repos/Example/production'
-  const moved = env.bridge()
+  const warnings = []
+  const moved = createBridge({
+    store: env.store,
+    github: env.github,
+    relay: env.relay,
+    logger: { debug() {}, warn: (message) => warnings.push(message) },
+  })
   await moved.poll()
   await moved.runJobs()
+  await moved.publish(env.report.id)
   await moved.relayReply({ reportId: env.report.id, messageId: 9, body: 'x' })
 
   assert.equal(
@@ -562,4 +605,52 @@ test('a changed repository stops the bridge reusing stored issue numbers', async
     before,
     'the bridge must not touch the new repository with stored mappings'
   )
+  assert.equal(warnings.length, 1)
+  assert.equal(
+    env.store.db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId)
+      .status,
+    'pending'
+  )
+  env.github.root = '/repos/example/SCRATCH'
+  await moved.runJobs()
+  assert.equal(env.comments.length, 1)
+  assert.equal(
+    env.store.db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId)
+      .status,
+    'completed'
+  )
+})
+
+test('unbound GitHub history is not silently assigned to a configured repository', async (t) => {
+  for (const history of ['issue', 'attempt', 'sync', 'cursor']) {
+    const env = setup(t)
+    if (history === 'issue')
+      env.store.db
+        .prepare(
+          "UPDATE reports SET state = 'published', issue_number = 7 WHERE id = ?"
+        )
+        .run(env.report.id)
+    else if (history === 'attempt') {
+      env.reports.requestPublish(env.report.id, {
+        staff: true,
+        guildId: 'scratch-guild',
+      })
+      env.store.claimBatch({ now: Date.now() + 60000 })
+    } else if (history === 'sync')
+      env.store.db
+        .prepare('INSERT INTO sync VALUES (?, ?, ?, ?, ?)')
+        .run('discord-github', '1', env.report.id, '7', 0)
+    else env.store.setCursor('github:issues', '2026-11-02T00:00:00Z')
+    const bridge = env.bridge()
+    await bridge.poll()
+    await bridge.runJobs()
+    await bridge.publish(env.report.id)
+    await bridge.relayReply({
+      reportId: env.report.id,
+      messageId: 9,
+      body: 'A reply',
+    })
+    assert.equal(env.requests.length, 0, history)
+    assert.equal(env.store.getCursor('github:repository'), undefined)
+  }
 })

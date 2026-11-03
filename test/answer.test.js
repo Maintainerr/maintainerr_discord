@@ -51,3 +51,37 @@ test('provider failure or an ungrounded citation falls back to doc links', async
     assert.doesNotMatch(await answer('Plex connection'), /untrusted.invalid/)
   }
 })
+
+test('answer formatting preserves legacy citation URLs and validates the truncated body', async () => {
+  const url = 'https://docs.example.test/overseerr/'
+  const docs = {
+    search: () => [
+      {
+        page: 'Overseerr',
+        heading: 'Connection',
+        url,
+        content: 'Use a connection URL.',
+      },
+    ],
+  }
+  const logger = { debug() {} }
+  for (const response of [
+    null,
+    `Overseerr connection. [Overseerr docs](${url})`,
+    `${'Documented advice. '.repeat(110)}\nSource: ${url}`,
+    `${'x'.repeat(1790)} ${url}`,
+  ]) {
+    const answer = createAnswerer({
+      docs,
+      logger,
+      provider: response === null ? null : { complete: async () => response },
+    })
+    const text = await answer('How do connections work?')
+    assert.ok(text.includes(url), response)
+    assert.doesNotMatch(text, /\/Seerr\//)
+    assert.match(text, /Seerr/)
+    assert.ok(text.length <= 1828)
+    if (response?.startsWith('Documented') || response?.startsWith('xxx'))
+      assert.match(text, /closest documentation sections/)
+  }
+})

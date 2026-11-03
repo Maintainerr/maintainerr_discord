@@ -100,6 +100,19 @@ export function redactSecrets(value, depth = 0) {
     ...new Set(pairedUsernames),
   ].join('|')})`
   const boundary = '(?<![A-Za-z0-9_-])'
+  // Environment and YAML values include punctuation that delimits log fields.
+  text = text.replace(
+    new RegExp(
+      `^([\\t ]*(?:export[\\t ]+)?(?:-[\\t ]+)?${key}[\\t ]*(?:=|:[\\t ]+)[\\t ]*)([^\\r\\n]*)`,
+      'gim'
+    ),
+    (line, prefix, value) =>
+      ['"', "'", '`'].includes(value[0]) ? line : `${prefix}[redacted]`
+  )
+  text = text.replace(
+    new RegExp(`([?&]${key}=)[^\\s&#"'<>]+`, 'gi'),
+    '$1[redacted]'
+  )
   text = text.replace(
     new RegExp(
       String.raw`(${boundary}${key}(\\+["'])\s*[:=]\s*\2)([\s\S]*?)\2`,
@@ -109,17 +122,14 @@ export function redactSecrets(value, depth = 0) {
   )
   text = text.replace(
     new RegExp(
-      String.raw`(${boundary}${key}["']?\s*[:=]\s*)(["'])((?:\\[\s\S]|(?!\2)[^\\])*)\2`,
+      String.raw`(${boundary}${key}["']?\s*[:=]\s*)(["'\x60])((?:\\[\s\S]|(?!\2)[^\\])*)\2`,
       'gi'
     ),
     '$1$2[redacted]$2'
   )
-  // An unquoted value runs to the end of the line: dotenv keeps semicolons,
-  // commas and spaces as part of the secret, so stopping at them leaks the tail.
-  // Only & still terminates, because it separates URL query parameters.
   text = text.replace(
     new RegExp(
-      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!["'])([^\\r\\n&]+)`,
+      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!\\[redacted\\])([^\\s&"'\x60,;<>}\\]]+)`,
       'gi'
     ),
     '$1[redacted]'

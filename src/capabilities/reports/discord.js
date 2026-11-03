@@ -231,9 +231,7 @@ export function createReportDiscord(client, ctx) {
   }
   async function triage(report, thread) {
     if (report.state !== 'triage') return
-    // Arguments evaluate before the call, so answering here would spend a model
-    // request and a daily quota unit on every restart even when sendOnce then
-    // finds the answer already posted.
+    // Restoring an existing answer must not spend model quota again.
     await ctx.relay.sendOnce(thread.id, `triage:${report.id}`, () =>
       ctx.answer(JSON.parse(report.fields).happened)
     )
