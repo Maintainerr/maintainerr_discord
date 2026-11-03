@@ -9,6 +9,7 @@ export function readConfig(env = process.env) {
     forumChannelId: env.DISCORD_FORUM_CHANNEL_ID?.trim() || null,
     launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
+    welcomeChannelId: env.DISCORD_WELCOME_CHANNEL_ID?.trim() || null,
     supportChannelIds: (env.DISCORD_SUPPORT_CHANNEL_IDS ?? '')
       .split(',')
       .map((id) => id.trim())
@@ -32,6 +33,7 @@ export function readConfig(env = process.env) {
     featureSmartDecoder: 'FEATURE_SMART_DECODER',
     featureScreenshots: 'FEATURE_SCREENSHOTS',
     featureTriage: 'FEATURE_TRIAGE',
+    featureWelcome: 'FEATURE_WELCOME',
     llmVision: 'LLM_VISION',
   })) {
     const value = env[variable]?.trim().toLowerCase() || 'false'
@@ -79,6 +81,14 @@ export function readConfig(env = process.env) {
     if (config.featureReports && !config[key])
       errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
+  if (config.welcomeChannelId && !/^\d{17,20}$/.test(config.welcomeChannelId))
+    errors.push(
+      'DISCORD_WELCOME_CHANNEL_ID must be a Discord ID of 17 to 20 digits.'
+    )
+  if (config.featureWelcome && !config.welcomeChannelId)
+    errors.push(
+      'DISCORD_WELCOME_CHANNEL_ID is required when FEATURE_WELCOME is enabled.'
+    )
   if (config.supportChannelIds.some((id) => !/^\d{17,20}$/.test(id)))
     errors.push(
       'DISCORD_SUPPORT_CHANNEL_IDS must be a comma-separated list of Discord IDs.'

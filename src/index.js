@@ -1,7 +1,7 @@
-import { Client, GatewayIntentBits, Partials } from 'discord.js'
+import { Client, Partials } from 'discord.js'
 import { config as loadEnv } from 'dotenv'
 import { readConfig } from './config.js'
-import capabilities from './capabilities/index.js'
+import capabilities, { gatewayIntents } from './capabilities/index.js'
 import { createCommandRegistry } from './commands/index.js'
 import { createLogger, describeError } from './lib/logging.js'
 import { createContext } from './runtime.js'
@@ -17,12 +17,7 @@ if (errors.length) {
 
 const logger = createLogger(config.logLevel)
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+  intents: gatewayIntents(config),
   partials: [Partials.Channel, Partials.Message],
 })
 let ctx

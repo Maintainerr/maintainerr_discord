@@ -32,7 +32,8 @@ export function createDiscordRelay(client, ctx) {
           before = messages.last().id
         }
         const body = typeof content === 'function' ? await content() : content
-        return (await thread.send(safeMessage(`${body}\n${marker}`, roles))).id
+        return (await thread.send(safeMessage(`${body}\n${marker}`, { roles })))
+          .id
       })()
       locks.set(key, work)
       try {

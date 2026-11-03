@@ -9,17 +9,28 @@ value actually was, and why the rule passed or failed.
 
 ## Using it
 
-In a server where the bot is installed, run `/maintainerr bot`. The bot opens a
-DM with instructions. From there:
+In the support forums:
+
+- Open a post with your question. The bot replies once with the closest
+  documentation sections. It reads the post's title and its first message.
+- Paste your Test Media output in a post, on its own or after a sentence, and the
+  bot explains which rules matched and why. A result too long for one message,
+  which Discord turns into an attached file, works too.
+
+Anywhere in the server:
+
+- `/ask` searches the documentation for your question.
+- `/testmedia` opens a private DM where you can paste results, as many as you
+  like, without starting a new session.
+
+To get your Test Media output:
 
 1. On the Collections tab, open the collection in question.
 2. Click Test Media.
 3. Search for an item and click Test.
 4. Copy the output with the orange clipboard icon.
-5. Paste it into the DM.
 
-It accepts the raw copy button output, or JSON or YAML in a code block. You can
-paste as many results as you like in the same DM without starting a new session.
+The bot accepts the raw copy button output, or JSON or YAML in a code block.
 
 ## Configuration
 
@@ -38,10 +49,12 @@ are reported together and do not print supplied values.
 | `FEATURE_SUPPORT`             | `false`                         | Register `/ask` and enable docs answering.                                                                                          |
 | `FEATURE_REPORTS`             | `false`                         | Enable the report launcher, forum intake and staff review.                                                                          |
 | `FEATURE_TRIAGE`              | `false`                         | Try docs answering for question reports before collecting files. Requires support and reports.                                      |
+| `FEATURE_WELCOME`             | `false`                         | Greet new members. Needs the privileged Server Members Intent.                                                                      |
 | `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                               |
 | `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                      |
 | `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                     |
 | `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated channels or forums for channel pastes, screenshots and automatic answers. Empty means DMs and `/ask` only.          |
+| `DISCORD_WELCOME_CHANNEL_ID`  | empty                           | Channel for welcome messages. Required with welcome.                                                                                |
 | `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                                                        |
 | `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                                                                |
 | `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                                                     |
@@ -133,6 +146,12 @@ Free tiers commonly fall outside the data-handling terms of their paid tiers,
 which can mean prompts are retained and used to improve the provider's models.
 Support questions carry logs and paths, so check the terms of the provider you
 configure. A self-hosted model keeps everything on your own hardware.
+
+With `FEATURE_WELCOME=true`, each new member is greeted in the welcome channel
+with the server's rules channel, the support channels, what the bot does and a
+link to this guide. Only the new member is mentioned. Enable the Server Members
+Intent in the Discord developer portal first: the bot requests that privileged
+intent only while welcome is on, so leaving the flag off never affects login.
 
 ## Running it
 
