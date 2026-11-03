@@ -57,6 +57,29 @@ function redactPrivateKeys(text) {
   }
 }
 
+// A YAML block scalar (| or >) keeps its value on the more indented lines
+// below the key, so those lines go; the key's own line is redacted later.
+function dropBlockScalars(text, key) {
+  const header = new RegExp(
+    `^([\\t ]*)(?:-[\\t ]+)?${key}[\\t ]*:[\\t ]+[|>][1-9+-]*[\\t ]*(?:#.*)?\\r?$`,
+    'i'
+  )
+  const lines = text.split('\n')
+  for (let index = 0; index < lines.length; index += 1) {
+    const indent = lines[index].match(header)?.[1].length
+    if (indent === undefined) continue
+    let end = index
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next].trimEnd()
+      if (!line) continue
+      if (line.length - line.trimStart().length <= indent) break
+      end = next
+    }
+    lines.splice(index + 1, end - index)
+  }
+  return lines.join('\n')
+}
+
 export function redactSecrets(value, depth = 0) {
   if (depth > 20) return '[redacted nested value]'
   if (typeof value === 'string') {
@@ -100,6 +123,7 @@ export function redactSecrets(value, depth = 0) {
     ...new Set(pairedUsernames),
   ].join('|')})`
   const boundary = '(?<![A-Za-z0-9_-])'
+  text = dropBlockScalars(text, key)
   // Environment and YAML values include punctuation that delimits log fields.
   text = text.replace(
     new RegExp(
@@ -122,7 +146,8 @@ export function redactSecrets(value, depth = 0) {
   )
   text = text.replace(
     new RegExp(
-      String.raw`(${boundary}${key}["']?\s*[:=]\s*)(["'\x60])((?:\\[\s\S]|(?!\2)[^\\])*)\2`,
+      // A doubled quote is an escaped quote in YAML single-quoted scalars.
+      String.raw`(${boundary}${key}["']?\s*[:=]\s*)(["'\x60])((?:\\[\s\S]|\2\2|(?!\2)[^\\])*)\2`,
       'gi'
     ),
     '$1$2[redacted]$2'
