@@ -98,6 +98,7 @@ function setup(t) {
     requests,
     relayed,
     relay,
+    github,
     change: () => {
       etag = '"two"'
     },
@@ -513,7 +514,52 @@ test('an unavailable Discord thread does not block polling other reports', async
     env.issues[1].state = 'closed'
     await bridge.poll()
     assert.deepEqual(states, ['closed'])
-    if (code === 10003)
+    if (code === 10003) {
       assert.ok(env.store.getCursor('discord:deleted-thread:fake-thread'))
+      continue
+    }
+    // A full page advances the window. A report skipped for a reason that may
+    // clear must hold it back, or its updates are never read again.
+    const skipped = new Date(Date.now() + 120000).toISOString()
+    const newer = new Date(Date.now() + 420000).toISOString()
+    env.issues[0].updated_at = skipped
+    for (let n = 3; n <= 101; n += 1)
+      env.issues.push({
+        number: n,
+        state: 'open',
+        updated_at: newer,
+        labels: [],
+      })
+    env.change()
+    await bridge.poll()
+    const cursor = env.store.getCursor('github:issues')?.cursor
+    assert.ok(
+      !cursor || cursor < skipped,
+      `window advanced to ${cursor}, past the skipped report`
+    )
   }
+})
+
+test('a changed repository stops the bridge reusing stored issue numbers', async (t) => {
+  const env = setup(t)
+  env.reports.requestPublish(env.report.id, {
+    staff: true,
+    guildId: 'scratch-guild',
+  })
+  await env.bridge().runJobs()
+  assert.equal(env.issues.length, 1)
+  const before = env.requests.length
+
+  // Same /data, different GITHUB_REPOSITORY: issue 1 here is a different issue.
+  env.github.root = '/repos/Example/production'
+  const moved = env.bridge()
+  await moved.poll()
+  await moved.runJobs()
+  await moved.relayReply({ reportId: env.report.id, messageId: 9, body: 'x' })
+
+  assert.equal(
+    env.requests.length,
+    before,
+    'the bridge must not touch the new repository with stored mappings'
+  )
 })

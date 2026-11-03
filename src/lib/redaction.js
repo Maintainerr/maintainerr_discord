@@ -114,9 +114,12 @@ export function redactSecrets(value, depth = 0) {
     ),
     '$1$2[redacted]$2'
   )
+  // An unquoted value runs to the end of the line: dotenv keeps semicolons,
+  // commas and spaces as part of the secret, so stopping at them leaks the tail.
+  // Only & still terminates, because it separates URL query parameters.
   text = text.replace(
     new RegExp(
-      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!["'])([^\\s&"',;<>}\\]]+)`,
+      `(${boundary}${key}["']?\\s*[:=]\\s*)(?!["'])([^\\r\\n&]+)`,
       'gi'
     ),
     '$1[redacted]'

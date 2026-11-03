@@ -42,6 +42,27 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       botId = Number(store.getCursor('github:bot')?.cursor) || null
     return botId
   }
+  // Issue numbers, poll cursors and sync rows are all repository-relative. If the
+  // configured repository changes while /data survives, stored mappings would act
+  // on same-numbered issues in the new one, so refuse rather than guess.
+  let mismatchLogged = false
+  const repositoryChanged = () => {
+    const stored = store.getCursor('github:repository')?.cursor
+    if (!stored) {
+      store.setCursor('github:repository', github.root, null, now())
+      return false
+    }
+    if (stored === github.root) return false
+    if (!mismatchLogged) {
+      mismatchLogged = true
+      logger.warn(
+        `GitHub sync is disabled: stored reports belong to ${stored} but GITHUB_REPOSITORY is now ${github.root}. ` +
+          'Point it back, or start from an empty database.'
+      )
+    }
+    return true
+  }
+
   const rememberBot = (item) => {
     if (bot() || item?.user?.type !== 'Bot' || !item.user.id) return
     botId = item.user.id
@@ -68,6 +89,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
 
   const bridge = {
     async publish(reportId) {
+      if (repositoryChanged()) return
       let report = get(reportId)
       if (!report || !['publishing', 'published'].includes(report.state)) return
       let issue
@@ -113,6 +135,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       await relay.published(report, issue)
     },
     async relayReply(payload) {
+      if (repositoryChanged()) return
       const report = get(payload.reportId)
       if (
         !report?.issue_number ||
@@ -145,6 +168,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       record('discord-github', payload.messageId, report.id, comment.id)
     },
     async poll() {
+      if (repositoryChanged()) return
       const cursor = store.getCursor('github:issues')
       const since = cursor?.cursor || new Date(now() - 60000).toISOString()
       const path = `${github.root}/issues?state=all&sort=updated&direction=asc&per_page=100&since=${encodeURIComponent(since)}`
@@ -154,6 +178,9 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       if (response.status === 304) return
       const issues = [...response.data]
       if (response.next) issues.push(...(await github.list(response.next)))
+      // Earliest issue skipped for a reason that may clear. The window must not
+      // move past it, or its updates are never read again.
+      let retryFrom = null
       for (const issue of issues) {
         const report = db
           .prepare('SELECT * FROM reports WHERE issue_number = ?')
@@ -173,7 +200,10 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
               `discord:deleted-thread:${report.thread_id}`,
               'true'
             )
-          // One unavailable thread must not stop synchronization of other reports.
+          // One unavailable thread must not stop synchronization of other
+          // reports, but the window has to wait for it.
+          if (!retryFrom || issue.updated_at < retryFrom)
+            retryFrom = issue.updated_at
           continue
         }
         const previous = store.getCursor(`github:comments:${issue.number}`)
@@ -215,9 +245,10 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           issue.updated_at > latest ? issue.updated_at : latest,
         since
       )
+      const reached = retryFrom && retryFrom < watermark ? retryFrom : watermark
       const advanced =
-        issues.length >= 100 && watermark > since
-          ? new Date(Date.parse(watermark) - 1000).toISOString()
+        issues.length >= 100 && reached > since
+          ? new Date(Date.parse(reached) - 1000).toISOString()
           : since
       store.setCursor(
         'github:issues',
@@ -226,6 +257,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       )
     },
     async runJobs() {
+      if (repositoryChanged()) return
       for (const job of store.claimBatch({ limit: 3, now: now() })) {
         try {
           if (job.kind === 'publish') await bridge.publish(job.payload.reportId)

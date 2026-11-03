@@ -11,6 +11,13 @@ export class RequestQueue {
     this.now = now
     this.wait = wait
     this.tail = Promise.resolve()
+    // A 429 is a statement about the credentials, not about one request, so the
+    // cooldown holds every queued question rather than only the one that got it.
+    this.until = 0
+  }
+
+  pauseUntil(timestamp) {
+    this.until = Math.max(this.until, timestamp)
   }
 
   run(fn, { deadline = Infinity } = {}) {
@@ -22,6 +29,12 @@ export class RequestQueue {
           this.tokens + (now - this.updated) / this.interval
         )
         this.updated = now
+      }
+      while (this.now() < this.until) {
+        const delay = this.until - this.now()
+        if (this.now() + delay > deadline)
+          throw new Error('Model queue exceeded the response window.')
+        await this.wait(delay)
       }
       refill()
       while (this.tokens < 1) {
@@ -63,6 +76,7 @@ export function createProvider(
       if (!store.consumeDaily('llm:daily', config.llmDailyLimit, now()))
         throw new Error('Daily model quota reached.')
       for (let attempt = 0; attempt < 4; attempt += 1) {
+        let cooldown = 0
         const response = await requests.run(
           async () => {
             const content = images.length
@@ -74,7 +88,7 @@ export function createProvider(
                   })),
                 ]
               : redactSecrets(user)
-            return fetchFn(endpoint, {
+            const sent = await fetchFn(endpoint, {
               method: 'POST',
               redirect: 'error',
               signal: AbortSignal.timeout(30000),
@@ -94,17 +108,29 @@ export function createProvider(
                 ],
               }),
             })
+            // Held here, inside the queued slot: setting it after run() returns
+            // lets the next queued request read the old value and send anyway.
+            if (sent.status === 429) {
+              cooldown = Math.max(
+                1000,
+                retryAfterMs(sent.headers, now()) ?? 1000 * 2 ** attempt
+              )
+              requests.pauseUntil?.(now() + cooldown)
+            }
+            return sent
           },
           { deadline }
         )
         if (response.status === 429 && attempt < 3) {
-          const after = retryAfterMs(response.headers, now())
-          const delay = Math.max(1000, after ?? 1000 * 2 ** attempt)
+          const delay = cooldown
           await response.body?.cancel()
           if (now() + delay > deadline)
             throw new Error(
               'Model provider is rate limited beyond the response window.'
             )
+          // Hold the shared queue too: the limit applies to the credentials, so
+          // other queued questions must not keep sending during the cooldown.
+          requests.pauseUntil?.(now() + delay)
           await wait(delay)
           continue
         }

@@ -138,3 +138,40 @@ test('provider requests never contain env-style credentials from pasted configur
     /fakePlex111|fakeRadarr333|fakeClient444|fakeAuth555/
   )
 })
+
+test('a 429 holds every queued request, not only the one that got it', async () => {
+  let clock = 0
+  const queue = new RequestQueue({
+    rpm: 60,
+    now: () => clock,
+    wait: async (delay) => {
+      clock += delay
+    },
+  })
+  const sent = []
+  const store = { consumeDaily: () => true, getCursor: () => null }
+  const provider = createProvider(
+    { llmBaseUrl: 'http://local.test/v1', llmModel: 'fake', llmDailyLimit: 99 },
+    store,
+    {
+      queue,
+      now: () => clock,
+      // The retrying request sleeps in real time without moving the clock, so
+      // only the queue can advance it. That is what isolates the shared hold.
+      wait: async () => {},
+      fetchFn: async () => {
+        sent.push(clock)
+        return sent.length === 1
+          ? new Response('', { status: 429, headers: { 'retry-after': '10' } })
+          : Response.json({ choices: [{ message: { content: 'ok' } }] })
+      },
+    }
+  )
+  await Promise.all([
+    provider.complete({ system: '', user: 'one' }),
+    provider.complete({ system: '', user: 'two' }),
+  ])
+  assert.equal(sent[0], 0)
+  for (const at of sent.slice(1))
+    assert.ok(at >= 10000, `sent at ${at} during the declared cooldown`)
+})

@@ -1,6 +1,24 @@
 import { redactSecrets } from '../../lib/redaction.js'
 import { describeError } from '../../lib/logging.js'
 
+const URLS = /https?:\/\/[^\s)\]>]+/g
+
+// Rename the product in prose only. Documentation keeps legacy routes, so a
+// cited URL containing /overseerr/ is a real address and rewriting it breaks
+// the citation it was validated against.
+function useSeerrName(value) {
+  let out = ''
+  let last = 0
+  for (const match of value.matchAll(URLS)) {
+    out +=
+      value
+        .slice(last, match.index)
+        .replace(/Overseerr|Jellyseerr/gi, 'Seerr') + match[0]
+    last = match.index + match[0].length
+  }
+  return out + value.slice(last).replace(/Overseerr|Jellyseerr/gi, 'Seerr')
+}
+
 export function createAnswerer({ docs, provider, logger }) {
   return async function answer(question) {
     const clean = redactSecrets(question).slice(0, 6000)
@@ -27,16 +45,16 @@ export function createAnswerer({ docs, provider, logger }) {
             })),
           }),
         })
-        const cited = response.match(/https?:\/\/[^\s)\]>]+/g) ?? []
+        // Shorten before validating: a citation that passes the check but falls
+        // outside the length cap would be published with no source at all.
+        const body = useSeerrName(redactSecrets(response)).slice(0, 1800)
+        const cited = body.match(URLS) ?? []
         const allowed = new Set(sections.map((section) => section.url))
-        if (cited.length && cited.every((url) => allowed.has(url)))
-          text = response
+        if (cited.length && cited.every((url) => allowed.has(url))) text = body
       } catch (err) {
         logger.debug('Using documentation fallback:', describeError(err))
       }
     }
-    return `**Maintainerr Support Bot**\n${redactSecrets(text)
-      .replace(/Overseerr|Jellyseerr/gi, 'Seerr')
-      .slice(0, 1800)}`
+    return `**Maintainerr Support Bot**\n${useSeerrName(redactSecrets(text)).slice(0, 1800)}`
   }
 }

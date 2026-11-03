@@ -48,11 +48,30 @@ test('bare secrets, prefixed secrets, compose assignments and Token authorizatio
     'MY_SERVICE_CLIENT_SECRET=fakeToken123',
   ]
   for (const assignment of cases) {
-    const output = redactSecrets(`before ${assignment} after`)
+    // An unquoted value runs to end of line, so neighbouring context is asserted
+    // on its own lines rather than trailing the assignment.
+    const output = redactSecrets(`before\n${assignment}\nafter`)
     assert.ok(!output.includes('fakeToken123'), assignment)
-    assert.ok(output.startsWith('before '), assignment)
-    assert.ok(output.endsWith(' after'), assignment)
+    assert.ok(output.startsWith('before\n'), assignment)
+    assert.ok(output.endsWith('\nafter'), assignment)
   }
+})
+
+test('an unquoted value is redacted to the end of the line', () => {
+  // dotenv keeps semicolons, commas and spaces inside the value, so stopping at
+  // them would publish the tail of a real password.
+  for (const [input, secret] of [
+    ['QBITTORRENT_PASSWORD=fakeStart;fakeRemainder', 'fakeRemainder'],
+    ['PLEX_TOKEN=fakeOne,fakeTwo', 'fakeTwo'],
+    ['API_KEY=fake one two', 'two'],
+  ]) {
+    assert.ok(!redactSecrets(input).includes(secret), input)
+  }
+  // & still terminates, so URL parameters after the secret survive.
+  assert.equal(
+    redactSecrets('https://plex.local/l?X-Plex-Token=fakeTok&page=2'),
+    'https://plex.local/l?X-Plex-Token=[redacted]&page=2'
+  )
 })
 
 test('structured and repeatedly escaped JSON use the same prefixed-key policy', () => {

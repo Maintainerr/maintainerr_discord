@@ -231,10 +231,11 @@ export function createReportDiscord(client, ctx) {
   }
   async function triage(report, thread) {
     if (report.state !== 'triage') return
-    await ctx.relay.sendOnce(
-      thread.id,
-      `triage:${report.id}`,
-      await ctx.answer(JSON.parse(report.fields).happened)
+    // Arguments evaluate before the call, so answering here would spend a model
+    // request and a daily quota unit on every restart even when sendOnce then
+    // finds the answer already posted.
+    await ctx.relay.sendOnce(thread.id, `triage:${report.id}`, () =>
+      ctx.answer(JSON.parse(report.fields).happened)
     )
   }
 

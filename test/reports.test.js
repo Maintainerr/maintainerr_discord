@@ -54,10 +54,11 @@ test('redaction covers each support ecosystem and preserves surrounding text', (
     ['"X-Plex-Token": "nestedPlex123"', 'nestedPlex123'],
   ]
   for (const [input, secret] of cases) {
-    const result = redactSecrets(`before ${input} after`)
+    // Unquoted values run to end of line, so context sits on its own lines.
+    const result = redactSecrets(`before\n${input}\nafter`)
     assert.ok(!result.includes(secret), input)
-    assert.ok(result.startsWith('before '), input)
-    assert.ok(result.endsWith(' after'), input)
+    assert.ok(result.startsWith('before\n'), input)
+    assert.ok(result.endsWith('\nafter'), input)
   }
 })
 

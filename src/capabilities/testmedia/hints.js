@@ -18,10 +18,13 @@ export function suggestFixes(payload) {
   for (const item of payloadItems(payload)) {
     for (const section of item.sectionResults ?? []) {
       for (const rule of section.ruleResults ?? []) {
+        // An exists or not_exists rule is meant to see a missing value, so no
+        // branch below should offer it missing-value guidance.
+        const comparison = !UNARY_ACTIONS.has(rule.action)
         const firstMissing = missing(rule.firstValue)
-        const secondMissing =
-          !UNARY_ACTIONS.has(rule.action) && missing(rule.secondValue)
+        const secondMissing = comparison && missing(rule.secondValue)
         if (
+          comparison &&
           firstMissing &&
           String(rule.firstValueName ?? '')
             .toLowerCase()
@@ -31,6 +34,7 @@ export function suggestFixes(payload) {
             'An empty sw_lastWatched can mean nobody has watched this show. Add a separate rule for never-watched media instead of comparing an empty watch date.'
           )
         } else if (
+          comparison &&
           [
             ['first', firstMissing],
             ['second', secondMissing],
