@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { redactSecrets } from '../lib/redaction.js'
-import { readLimited } from '../lib/http.js'
+import { readLimited, retryAfterMs } from '../lib/http.js'
 
 export class RequestQueue {
   constructor({ rpm = 1, capacity = 1, now = Date.now, wait = sleep } = {}) {
@@ -98,14 +98,8 @@ export function createProvider(
           { deadline }
         )
         if (response.status === 429 && attempt < 3) {
-          const retryAfter = response.headers.get('retry-after')
-          const delay =
-            retryAfter && /^\d+$/.test(retryAfter)
-              ? Number(retryAfter) * 1000
-              : Math.max(
-                  1000,
-                  Date.parse(retryAfter) - now() || 1000 * 2 ** attempt
-                )
+          const after = retryAfterMs(response.headers, now())
+          const delay = Math.max(1000, after ?? 1000 * 2 ** attempt)
           await response.body?.cancel()
           if (now() + delay > deadline)
             throw new Error(

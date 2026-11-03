@@ -34,6 +34,19 @@ export function issueBody(report, attachments) {
 }
 
 export function createBridge({ store, github, relay, logger, now = Date.now }) {
+  // Our own bot user id, learned from the first issue or comment we write, so a
+  // different app on the repository cannot claim one of our markers.
+  let botId
+  const bot = () => {
+    if (botId === undefined)
+      botId = Number(store.getCursor('github:bot')?.cursor) || null
+    return botId
+  }
+  const rememberBot = (item) => {
+    if (bot() || item?.user?.type !== 'Bot' || !item.user.id) return
+    botId = item.user.id
+    store.setCursor('github:bot', String(botId), null, now())
+  }
   const { db } = store
   let timer
   let active
@@ -71,7 +84,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           `${github.root}/issues?state=all&labels=source%3Adiscord&per_page=100`
         )
         issue = existing.find(
-          (item) => !item.pull_request && ownsMarker(item, marker)
+          (item) => !item.pull_request && ownsMarker(item, marker, bot())
         )
         if (!issue) {
           if (!labelsReady) {
@@ -91,6 +104,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
             })
           ).data
         }
+        rememberBot(issue)
         db.prepare(
           "UPDATE reports SET state = 'published', issue_number = ?, updated_at = ? WHERE id = ?"
         ).run(issue.number, now(), report.id)
@@ -110,7 +124,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       const comments = await github.list(
         `${github.root}/issues/${report.issue_number}/comments?per_page=100`
       )
-      let comment = comments.find((item) => ownsMarker(item, marker))
+      let comment = comments.find((item) => ownsMarker(item, marker, bot()))
       if (!comment) {
         await github.request(
           'PATCH',
@@ -127,6 +141,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
           )
         ).data
       }
+      rememberBot(comment)
       record('discord-github', payload.messageId, report.id, comment.id)
     },
     async poll() {

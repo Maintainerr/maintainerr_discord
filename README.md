@@ -123,6 +123,11 @@ Text prompts are redacted and retrieval is limited to three short sections.
 Screenshot pixels cannot be text-redacted, so screenshot reading is separately
 opted into. Quotas and provider failures never disable the deterministic decoder.
 
+Free tiers commonly fall outside the data-handling terms of their paid tiers,
+which can mean prompts are retained and used to improve the provider's models.
+Support questions carry logs and paths, so check the terms of the provider you
+configure. A self-hosted model keeps everything on your own hardware.
+
 ## Running it
 
 With podman:

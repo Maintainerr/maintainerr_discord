@@ -6,6 +6,7 @@ import { createReportService } from '../src/capabilities/reports/service.js'
 import { appJwt, createGitHub } from '../src/github/client.js'
 import { createBridge } from '../src/github/bridge.js'
 import { createDiscordRelay } from '../src/github/discord-relay.js'
+import { retryAfterMs } from '../src/lib/http.js'
 import {
   reportMarker,
   commentMarker,
@@ -253,6 +254,35 @@ test('user text cannot impersonate a bot-owned idempotency marker', () => {
     ownsMarker({ user: { type: 'Bot' }, body: `${marker}\nreport` }, marker),
     true
   )
+  // Once our own bot id is known, another app's bot cannot claim the marker.
+  assert.equal(
+    ownsMarker(
+      { user: { type: 'Bot', id: 7 }, body: `${marker}\nx` },
+      marker,
+      7
+    ),
+    true
+  )
+  assert.equal(
+    ownsMarker(
+      { user: { type: 'Bot', id: 9 }, body: `${marker}\nx` },
+      marker,
+      7
+    ),
+    false
+  )
+})
+
+test('Retry-After is read the same way for every client', () => {
+  const now = 1000000
+  const at = (value) =>
+    retryAfterMs(new Headers(value ? { 'retry-after': value } : {}), now)
+  assert.equal(at('5'), 5000)
+  assert.equal(at('0'), 0, 'retry immediately is not the same as absent')
+  assert.equal(at(new Date(now + 30000).toUTCString()), 30000)
+  assert.equal(at(new Date(now - 30000).toUTCString()), 0, 'past dates clamp')
+  assert.equal(at('soon'), null)
+  assert.equal(at(null), null)
 })
 
 test('unchanged poll makes one conditional request and closing and replying change both states', async (t) => {
