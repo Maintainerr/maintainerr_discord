@@ -32,7 +32,8 @@ Copy `.env.example` to `.env` and fill it in.
 | `DISCORD_GUILD_ID` | no       | Register the slash command in one guild instead of globally. Guild commands appear immediately, global ones can take up to an hour. Useful while developing. |
 
 The bot needs the `applications.commands` scope and, in the bot settings, the
-Guilds and Direct Messages intents.
+Guilds, Direct Messages, Guild Messages and Message Content intents. Enable the
+privileged Message Content intent in the Discord developer portal.
 
 ## Running it
 
@@ -81,3 +82,9 @@ injected at runtime by whatever runs the container, and only `package.json`,
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## phase5 configuration
+
+Add opt-in smarter decoding, threaded channel pastes, deterministic hints, generated Rules.mdx anchors and scoped screenshot extraction. Shared docs/provider code supports decoder features; no /ask command or report intake is registered. Prompts redact prefixed env credentials; retries share one daily unit.
+
+Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
