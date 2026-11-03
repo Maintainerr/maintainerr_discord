@@ -1,0 +1,53 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { openDatabase } from '../src/db.js'
+import {
+  chunkDocument,
+  createDocsIndex,
+} from '../src/capabilities/support/docs.js'
+import { createAnswerer } from '../src/capabilities/support/answer.js'
+
+test('without a provider answering returns the three closest doc links', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const docs = createDocsIndex(store)
+  docs.replace(
+    chunkDocument(
+      '# Rules\n## Plex connection\nPlex connection URL\n## Radarr connection\nRadarr connection URL\n## Sonarr connection\nSonarr connection URL',
+      'docs/Rules.mdx'
+    )
+  )
+  const answer = createAnswerer({ docs, logger: { debug() {} } })
+  const text = await answer('How do I set a connection URL?')
+  assert.equal((text.match(/https:\/\//g) ?? []).length, 3)
+  assert.match(text, /support bot/)
+})
+
+test('provider failure or an ungrounded citation falls back to doc links', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const docs = createDocsIndex(store)
+  docs.replace(
+    chunkDocument(
+      '# Rules\n## Connections\nPlex connection URL',
+      'docs/Rules.mdx'
+    )
+  )
+  for (const complete of [
+    async () => {
+      throw new Error('quota reached')
+    },
+    async () => 'Use https://untrusted.invalid/setting',
+  ]) {
+    const answer = createAnswerer({
+      docs,
+      provider: { complete },
+      logger: { debug() {} },
+    })
+    assert.match(
+      await answer('Plex connection'),
+      /closest documentation sections/
+    )
+    assert.doesNotMatch(await answer('Plex connection'), /untrusted.invalid/)
+  }
+})

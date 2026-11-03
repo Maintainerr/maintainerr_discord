@@ -88,3 +88,9 @@ MIT. See [LICENSE](LICENSE).
 Add opt-in smarter decoding, threaded channel pastes, deterministic hints, generated Rules.mdx anchors and scoped screenshot extraction. Shared docs/provider code supports decoder features; no /ask command or report intake is registered. Prompts redact prefixed env credentials; retries share one daily unit.
 
 Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
+
+## phase6 configuration
+
+Add feature-gated /ask, BM25 doc-link fallback, optional grounded completion, one opt-in support channel, user cooldowns and feedback escalation. Disabled /ask is removed without deleting unrelated commands.
+
+Additional variables: `DISCORD_GUILD_ID`, `DISCORD_SUPPORT_CHANNEL_ID`, `DISCORD_TOKEN`, `DOCS_ORIGIN`, `DOCS_REF`, `DOCS_REPOSITORY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LOG_LEVEL`, `MAINTAINERR_DISCORD_DB`
