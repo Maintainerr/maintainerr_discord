@@ -6,6 +6,13 @@ on:
       - main
   workflow_dispatch:
 
+# One run at a time, so a quick series of merges cannot leave `latest` on an
+# older build. A newer merge replaces any run still waiting, and a push in
+# progress is never cancelled halfway.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest

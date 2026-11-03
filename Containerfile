@@ -27,4 +27,5 @@ RUN mkdir -p /data && chown -R node:node /data /app
 USER node
 VOLUME ["/data"]
 
-CMD ["npm", "start"]
+# node directly: npm adds update notices to the log and a process in between.
+CMD ["node", "src/index.js"]
