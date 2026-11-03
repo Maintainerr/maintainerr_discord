@@ -33,6 +33,7 @@ const redirects = {
   },
 }
 const fieldLabels = {
+  title: 'Title',
   version: 'Maintainerr Version and Install Method',
   server: 'Media Server and Version',
   happened: 'What Happened',
@@ -61,8 +62,14 @@ export function reportControls(report) {
   return [row(...buttons)]
 }
 
+// Reports filed before the Title field have only the derived title column.
+const reportFields = (report) => ({
+  title: report.title,
+  ...JSON.parse(report.fields),
+})
+
 export function reportSummary(report) {
-  const fields = JSON.parse(report.fields)
+  const fields = reportFields(report)
   return `**Bug Report**\nState: ${report.state}\n\n${Object.entries(
     fieldLabels
   )
@@ -74,18 +81,19 @@ function reportModal(report) {
   const modal = new ModalBuilder()
     .setCustomId(report ? `report:save:${report.id}` : 'report:create:bug')
     .setTitle('Bug Report')
-  const fields = report ? JSON.parse(report.fields) : {}
+  const fields = report ? reportFields(report) : {}
   for (const [key, label] of Object.entries(fieldLabels)) {
     const input = new TextInputBuilder()
       .setCustomId(key)
       .setLabel(label)
       .setStyle(
-        key === 'version' || key === 'server'
+        ['title', 'version', 'server'].includes(key)
           ? TextInputStyle.Short
           : TextInputStyle.Paragraph
       )
       .setRequired(true)
       .setMaxLength(FIELD_LIMITS[key])
+    if (key === 'title') input.setPlaceholder('A short summary of the bug')
     if (fields[key]) input.setValue(fields[key])
     modal.addComponents(new ActionRowBuilder().addComponents(input))
   }
