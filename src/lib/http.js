@@ -25,10 +25,10 @@ export async function readLimited(response, limit) {
 // opening an everyone/here vector.
 // Link previews would turn every cited docs link, and any URL a user put in a
 // report, into a large card. The decoder's own embeds are sent separately.
-export function safeMessage(text, roles = []) {
+export function safeMessage(text, { roles = [], users = [] } = {}) {
   return {
     content: text,
-    allowedMentions: { parse: [], roles },
+    allowedMentions: { parse: [], roles, users },
     flags: MessageFlags.SuppressEmbeds,
   }
 }

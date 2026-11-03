@@ -18,17 +18,22 @@ async function upsertCommands(commandManager, commands, managedNames) {
   }
 }
 
+// Commands this bot used to register. Only managed names are ever deleted, and
+// nothing defines these any more, so list them or they linger as dead commands.
+const RETIRED = ['maintainerr']
+
 export function createCommandRegistry(
   capabilities,
   ctx,
   allCapabilities = capabilities
 ) {
   const commands = new Map()
-  const managedNames = new Set(
-    allCapabilities.flatMap((capability) =>
+  const managedNames = new Set([
+    ...RETIRED,
+    ...allCapabilities.flatMap((capability) =>
       capability.commands.map((command) => command.data.name)
-    )
-  )
+    ),
+  ])
 
   for (const capability of capabilities) {
     for (const command of capability.commands) {

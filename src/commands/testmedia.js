@@ -4,16 +4,11 @@ import { handleBotCommand } from '../capabilities/testmedia/decoder.js'
 export const commands = [
   {
     data: new SlashCommandBuilder()
-      .setName('maintainerr')
-      .setDescription('Maintainerr Discord tools.')
-      .addSubcommand((subcommand) =>
-        subcommand
-          .setName('bot')
-          .setDescription(
-            'Open a DM session to decode Maintainerr Test Media results.'
-          )
+      .setName('testmedia')
+      .setDescription(
+        'Explain a Maintainerr Test Media result in a private DM.'
       )
       .toJSON(),
-    handlers: new Map([['bot', handleBotCommand]]),
+    handlers: new Map([['', handleBotCommand]]),
   },
 ]

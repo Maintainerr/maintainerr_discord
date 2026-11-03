@@ -106,3 +106,17 @@ test('support channels are a comma-separated list of Discord IDs', () => {
     }).errors.some((error) => error.includes('DISCORD_SUPPORT_CHANNEL_IDS'))
   )
 })
+
+test('welcome cannot be enabled without its channel', () => {
+  const base = { DISCORD_TOKEN: 'fake-token', FEATURE_WELCOME: 'true' }
+  assert.ok(
+    readConfig(base).errors.some((error) =>
+      error.includes('DISCORD_WELCOME_CHANNEL_ID')
+    )
+  )
+  assert.deepEqual(
+    readConfig({ ...base, DISCORD_WELCOME_CHANNEL_ID: '123456789012345678' })
+      .errors,
+    []
+  )
+})

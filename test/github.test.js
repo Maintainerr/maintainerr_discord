@@ -405,6 +405,7 @@ test('a deleted report thread exhausts the job once and staff receive exactly on
   assert.deepEqual(notices[0].allowedMentions, {
     parse: [],
     roles: ['fake-staff'],
+    users: [],
   })
   const restarted = bridge()
   for (let tick = 0; tick < 3; tick += 1) await restarted.runJobs()
@@ -484,6 +485,7 @@ test('a failure notice keeps its launcher destination across permission recovery
     assert.deepEqual(sent[1].allowedMentions, {
       parse: [],
       roles: ['fake-staff'],
+      users: [],
     })
   }
 })

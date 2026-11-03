@@ -88,7 +88,7 @@ export function findPaste(message, ctx) {
 
 export async function handleBotCommand(interaction, { logger }) {
   logger.debug(
-    `[slash] /maintainerr bot used by ${interaction.user.tag} in ${
+    `[slash] /testmedia used by ${interaction.user.tag} in ${
       interaction.guild?.name ?? 'DM'
     }`
   )
@@ -164,7 +164,7 @@ export async function handleDM(message, ctx = {}, text = message.content) {
     } catch {
       await message.reply(
         "I couldn't parse that payload.\n\n" +
-          "Paste the output copied directly from Maintainerr's Test Media panel, or use `/maintainerr bot` in a server if you want the instructions again. " +
+          "Paste the output copied directly from Maintainerr's Test Media panel, or use `/testmedia` in a server if you want the instructions again. " +
           'I accept either the raw copy-button output or JSON in a code block.'
       )
       return
