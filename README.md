@@ -25,10 +25,11 @@ paste as many results as you like in the same DM without starting a new session.
 
 Copy `.env.example` to `.env` and fill it in.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `DISCORD_TOKEN` | yes | Bot token from the Discord developer portal. Anyone holding it controls the bot, so keep it out of version control. |
-| `DISCORD_GUILD_ID` | no | Register the slash command in one guild instead of globally. Guild commands appear immediately, global ones can take up to an hour. Useful while developing. |
+| Variable           | Required | Purpose                                                                                                                                                      |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DISCORD_TOKEN`    | yes      | Bot token from the Discord developer portal. Anyone holding it controls the bot, so keep it out of version control.                                          |
+| `LOG_LEVEL`        | no       | Minimum log level: debug (default), info, warn, error, or silent.                                                                                            |
+| `DISCORD_GUILD_ID` | no       | Register the slash command in one guild instead of globally. Guild commands appear immediately, global ones can take up to an hour. Useful while developing. |
 
 The bot needs the `applications.commands` scope and, in the bot settings, the
 Guilds and Direct Messages intents.

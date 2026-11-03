@@ -6,7 +6,7 @@ import {
   FIELD_LABEL_RULES,
   SECOND_VALUE_LABELS,
   UNARY_ACTIONS,
-} from '../src/rule-definitions.js'
+} from '../src/capabilities/testmedia/rule-definitions.js'
 
 // The formatter interpolates each template against a fixed set of names. A
 // template naming anything else renders the placeholder literally to the user,

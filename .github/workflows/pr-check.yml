@@ -31,4 +31,5 @@ jobs:
       - name: Syntax check sources
         run: |
           podman run --rm maintainerr_discord:pr \
-            sh -c 'for f in src/*.js; do node --check "$f" || exit 1; done'
+            find src -type f -name '*.js' \
+              -exec sh -c 'for f do node --check "$f" || exit 1; done' sh {} +
