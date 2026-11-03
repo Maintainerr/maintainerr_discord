@@ -67,3 +67,24 @@ test('optional configuration accepts valid IDs and documented log levels', () =>
     )
   }
 })
+
+test('reports cannot be enabled without naming the target repository', () => {
+  const base = {
+    DISCORD_TOKEN: 'fake-token',
+    FEATURE_REPORTS: 'true',
+    DISCORD_FORUM_CHANNEL_ID: '123456789012345678',
+    DISCORD_LAUNCHER_CHANNEL_ID: '123456789012345679',
+    DISCORD_STAFF_ROLE_ID: '123456789012345670',
+  }
+  // No default target: enabling reports with no repository must not silently
+  // fall back to the production tracker.
+  const missing = readConfig(base)
+  assert.equal(missing.config.githubRepository, '')
+  assert.ok(missing.errors.some((error) => error.includes('GITHUB_REPOSITORY')))
+
+  const scratch = readConfig({ ...base, GITHUB_REPOSITORY: 'someone/scratch' })
+  assert.equal(scratch.config.githubRepository, 'someone/scratch')
+  assert.ok(
+    !scratch.errors.some((error) => error.includes('GITHUB_REPOSITORY'))
+  )
+})

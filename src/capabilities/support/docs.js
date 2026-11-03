@@ -212,11 +212,14 @@ export async function refreshDocs(index, config, fetchFn = fetch) {
         Accept: 'application/vnd.github+json',
       },
       signal: AbortSignal.timeout(15000),
+      redirect: 'error',
     }
   )
   if (!response.ok)
     throw new Error(`Docs tree returned HTTP ${response.status}.`)
-  const tree = await response.json()
+  const tree = JSON.parse(
+    (await readLimited(response, 4 * 1024 * 1024)).toString('utf8')
+  )
   if (tree.truncated || !tree.sha || !Array.isArray(tree.tree))
     throw new Error('Docs tree is incomplete.')
   const files = tree.tree.filter(
@@ -237,7 +240,7 @@ export async function refreshDocs(index, config, fetchFn = fetch) {
   for (const file of files) {
     const document = await fetchFn(
       `https://raw.githubusercontent.com/${config.docsRepository}/${tree.sha}/${file.path}`,
-      { signal: AbortSignal.timeout(15000) }
+      { signal: AbortSignal.timeout(15000), redirect: 'error' }
     )
     if (!document.ok)
       throw new Error(`Docs file returned HTTP ${document.status}.`)

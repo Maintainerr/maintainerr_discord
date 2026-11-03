@@ -13,8 +13,7 @@ export function readConfig(env = process.env) {
     githubAppId: env.GITHUB_APP_ID?.trim() || '',
     githubInstallationId: env.GITHUB_INSTALLATION_ID?.trim() || '',
     githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replaceAll('\\n', '\n') || '',
-    githubRepository:
-      env.GITHUB_REPOSITORY?.trim() || 'Maintainerr/Maintainerr',
+    githubRepository: env.GITHUB_REPOSITORY?.trim() || '',
     llmBaseUrl: env.LLM_BASE_URL?.trim() || '',
     llmApiKey: env.LLM_API_KEY || '',
     llmModel: env.LLM_MODEL?.trim() || '',
@@ -78,7 +77,12 @@ export function readConfig(env = process.env) {
     if (config.featureReports && key !== 'supportChannelId' && !config[key])
       errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
+  if (config.featureReports && !config.githubRepository)
+    errors.push(
+      'GITHUB_REPOSITORY is required when FEATURE_REPORTS is enabled. There is no default: name the repository that issues should be opened in.'
+    )
   for (const key of ['githubRepository', 'docsRepository']) {
+    if (!config[key]) continue
     if (!/^[\w.-]+\/[\w.-]+$/.test(config[key]))
       errors.push(`${key} must have owner/name format.`)
   }

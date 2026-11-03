@@ -17,8 +17,12 @@ export async function readLimited(response, limit) {
   return Buffer.concat(chunks)
 }
 
-export function safeMessage(text) {
-  return { content: text, allowedMentions: { parse: [] } }
+// parse selects which mention categories are resolved from the content; roles
+// is a separate explicit allowlist of ids. Keeping parse empty means nothing is
+// pinged except the ids passed in, so a staff alert can reach a human without
+// opening an everyone/here vector.
+export function safeMessage(text, roles = []) {
+  return { content: text, allowedMentions: { parse: [], roles } }
 }
 
 // RFC 9110 allows Retry-After as either delay-seconds or an HTTP-date. Both the

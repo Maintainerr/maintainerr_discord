@@ -400,7 +400,12 @@ test('a deleted report thread exhausts the job once and staff receive exactly on
   assert.match(notices[0].content, /<@&fake-staff>/)
   assert.ok(notices[0].content.includes(env.report.id))
   assert.match(notices[0].content, /thread is deleted or inaccessible/)
-  assert.deepEqual(notices[0].allowedMentions, { parse: [] })
+  // The alert exists to reach a human, so the staff role must be allowed
+  // through; parse stays empty so nothing else, including everyone, can ping.
+  assert.deepEqual(notices[0].allowedMentions, {
+    parse: [],
+    roles: ['fake-staff'],
+  })
   const restarted = bridge()
   for (let tick = 0; tick < 3; tick += 1) await restarted.runJobs()
   await restarted.poll()
@@ -473,6 +478,13 @@ test('a failure notice keeps its launcher destination across permission recovery
       1,
       `Duplicate notice after permission recovery: ${code}`
     )
+    // A healthy thread is the common destination, so it must ping staff too.
+    await createDiscordRelay(client, ctx).failed(report, { ...job, id: 2 })
+    assert.equal(sent[1].channelId, 'fake-thread')
+    assert.deepEqual(sent[1].allowedMentions, {
+      parse: [],
+      roles: ['fake-staff'],
+    })
   }
 })
 
