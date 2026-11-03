@@ -18,8 +18,13 @@ RUN yarn install --frozen-lockfile --production
 
 COPY src ./src
 
-# Mount a named volume here; reports and pending jobs must survive replacement.
-RUN mkdir -p /data
+# Run unprivileged. At runtime this process holds a GitHub App private key and a
+# Discord token, and writes persistent state, so it must not be root. The base
+# image already ships an unprivileged `node` user. Ownership is set before
+# VOLUME so a fresh named volume inherits it on first mount.
+# Mount a named volume at /data; reports and pending jobs must survive replacement.
+RUN mkdir -p /data && chown -R node:node /data /app
+USER node
 VOLUME ["/data"]
 
 CMD ["npm", "start"]
