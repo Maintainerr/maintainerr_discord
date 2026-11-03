@@ -26,6 +26,18 @@ const button = (id, label, style = ButtonStyle.Secondary) =>
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons)
 
 export function reportControls(report) {
+  if (report.state === 'triage')
+    return [
+      row(
+        button(
+          `report:resolved:${report.id}`,
+          'This solved it',
+          ButtonStyle.Success
+        ),
+        button(`report:unresolved:${report.id}`, 'Still need help'),
+        button(`report:cancel:${report.id}`, 'Cancel')
+      ),
+    ]
   if (!['collecting', 'ready'].includes(report.state)) return []
   const buttons =
     report.state === 'collecting'
@@ -217,6 +229,14 @@ export function createReportDiscord(client, ctx) {
       : await channel.send(payload)
     ctx.store.setCursor('reports:launcher', message.id)
   }
+  async function triage(report, thread) {
+    if (report.state !== 'triage') return
+    await ctx.relay.sendOnce(
+      thread.id,
+      `triage:${report.id}`,
+      await ctx.answer(JSON.parse(report.fields).happened)
+    )
+  }
 
   return {
     ...service,
@@ -233,8 +253,9 @@ export function createReportDiscord(client, ctx) {
         if (ctx.store.getCursor(`discord:deleted-thread:${report.thread_id}`))
           continue
         try {
-          await ensureThread(report)
+          const thread = await ensureThread(report)
           await update(service.get(report.id))
+          await triage(report, thread)
         } catch (err) {
           if (![10003, 50001, 50013].includes(err.code)) throw err
           if (err.code === 10003)
@@ -299,6 +320,7 @@ export function createReportDiscord(client, ctx) {
               `Your report is open in <#${thread.id}>. Add images or text logs there, then choose Done or No files.`
             )
           )
+          await triage(created, thread)
           return
         }
         let changed = report
@@ -308,6 +330,12 @@ export function createReportDiscord(client, ctx) {
           content = 'Your report is ready for a maintainer to review.'
         } else if (action === 'cancel')
           changed = service.cancel(id, interaction.user.id)
+        else if (action === 'resolved' || action === 'unresolved')
+          changed = service.triage(
+            id,
+            interaction.user.id,
+            action === 'resolved'
+          )
         else if (action === 'save' && interaction.isModalSubmit())
           changed = service.edit(
             id,
