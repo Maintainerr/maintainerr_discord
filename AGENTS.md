@@ -51,7 +51,7 @@ Reviewed against app `main` at `3dbd5463a82beb4cd970a41c3afd042af4fccfd8` on
 - Run focused checks during development and the full `yarn test` suite for final
   validation. Run `yarn format` in write mode before committing, then review the
   diff for unrelated changes.
-- Record changes, evidence, and limitations in [AUDIT.log](AUDIT.log). Preserve
+- Record changes, evidence, and limitations in the local `AUDIT.log`. Preserve
   unrelated working-tree and staged changes.
 - Use Conventional Commits and focused PRs. Keep PR descriptions brief and
   explain the behavior and reason for the change.
