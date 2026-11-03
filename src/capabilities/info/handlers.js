@@ -21,34 +21,16 @@ Not right away. Rules never delete anything by themselves: they add matching med
 
 How it works: ${config.docsOrigin}/works/#take-action-after-days`
 
-const unraidText = () => `**Unraid: Upgrading to v2.0.0**
-Older Unraid templates need these changes for Maintainerr v2.0.0 and later.
-1. Open the Unraid terminal, the \`>_\` symbol at the top right.
-2. Run \`chown -R 1000:1000 /mnt/user/appdata/<maintainerr config folder>\`.
-3. In the Docker tab, edit the Maintainerr template.
-4. Remove the "WebUI" configuration completely.
-5. Select "Add another Path, Port, Variable, Label or Device" and set:
-   - Config Type: Port
-   - Name: WebUI
-   - Container Port: 6246
-   - Host Port: your custom port, or leave 6246
-   - Connection Type: TCP
-6. Select Save.
-7. At the top right of the template, change "Basic View" to "Advanced View".
-8. Change \`WebUI: http://[IP]:[PORT:80]\` to \`WebUI: http://[IP]:[PORT:6246]\`.`
-
 const log = (interaction, ctx) =>
   ctx.logger.debug(
     `[${interaction.commandName}] ${interaction.user.tag} in ${where(interaction)}`
   )
 
-// Shared answers are public, so a helper can post one in someone's thread.
-const answer = (render) => async (interaction, ctx) => {
+// Public, so a helper can post it in someone's thread.
+export async function handleDelete(interaction, ctx) {
   log(interaction, ctx)
-  await interaction.reply(safeMessage(render(ctx.config)))
+  await interaction.reply(safeMessage(deleteText(ctx.config)))
 }
-export const handleDelete = answer(deleteText)
-export const handleUnraid = answer(unraidText)
 
 export async function handleHelp(interaction, ctx) {
   log(interaction, ctx)

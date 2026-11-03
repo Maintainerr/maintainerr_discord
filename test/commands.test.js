@@ -55,6 +55,6 @@ test('/help lists exactly the registered commands', async () => {
       .split('\n')
       .filter((line) => line.startsWith('- `/'))
       .map((line) => line.slice(3, line.indexOf('`', 3))),
-    ['/delete', '/help', '/testmedia', '/unraid']
+    ['/delete', '/help', '/testmedia']
   )
 })

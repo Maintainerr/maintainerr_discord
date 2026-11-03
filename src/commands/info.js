@@ -1,9 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js'
-import {
-  handleDelete,
-  handleHelp,
-  handleUnraid,
-} from '../capabilities/info/handlers.js'
+import { handleDelete, handleHelp } from '../capabilities/info/handlers.js'
 
 const command = (name, description, handler) => ({
   data: new SlashCommandBuilder()
@@ -23,10 +19,5 @@ export const commands = [
     'delete',
     'Learn when Maintainerr takes action on your media.',
     handleDelete
-  ),
-  command(
-    'unraid',
-    'Show the Unraid steps for upgrading to Maintainerr v2.0.0.',
-    handleUnraid
   ),
 ]
