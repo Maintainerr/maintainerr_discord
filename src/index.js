@@ -19,6 +19,8 @@ const logger = createLogger(config.logLevel)
 const client = new Client({
   intents: gatewayIntents(config),
   partials: [Partials.Channel, Partials.Message],
+  // A message that names its own mentions overrides this; nothing else pings.
+  allowedMentions: { parse: [] },
 })
 let ctx
 try {
