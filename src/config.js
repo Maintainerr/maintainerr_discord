@@ -6,6 +6,9 @@ export function readConfig(env = process.env) {
     discordGuildId: env.DISCORD_GUILD_ID?.trim() || null,
     logLevel: env.LOG_LEVEL?.trim() || 'debug',
     dbPath: env.MAINTAINERR_DISCORD_DB?.trim() || '/data/bot.sqlite',
+    forumChannelId: env.DISCORD_FORUM_CHANNEL_ID?.trim() || null,
+    launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
+    staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
     supportChannelId: env.DISCORD_SUPPORT_CHANNEL_ID?.trim() || null,
     llmBaseUrl: env.LLM_BASE_URL?.trim() || '',
     llmApiKey: env.LLM_API_KEY || '',
@@ -17,6 +20,7 @@ export function readConfig(env = process.env) {
   }
   const errors = []
   for (const [key, variable] of Object.entries({
+    featureReports: 'FEATURE_REPORTS',
     featureSupport: 'FEATURE_SUPPORT',
     featureSmartDecoder: 'FEATURE_SMART_DECODER',
     featureScreenshots: 'FEATURE_SCREENSHOTS',
@@ -58,10 +62,15 @@ export function readConfig(env = process.env) {
   }
 
   for (const [key, variable] of [
+    ['forumChannelId', 'DISCORD_FORUM_CHANNEL_ID'],
+    ['launcherChannelId', 'DISCORD_LAUNCHER_CHANNEL_ID'],
+    ['staffRoleId', 'DISCORD_STAFF_ROLE_ID'],
     ['supportChannelId', 'DISCORD_SUPPORT_CHANNEL_ID'],
   ]) {
     if (config[key] && !/^\d{17,20}$/.test(config[key]))
       errors.push(`${variable} must be a Discord ID of 17 to 20 digits.`)
+    if (config.featureReports && key !== 'supportChannelId' && !config[key])
+      errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
   for (const key of ['docsRepository']) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(config[key]))
