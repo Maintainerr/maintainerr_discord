@@ -135,4 +135,10 @@ test('welcome cannot be enabled without its channel', () => {
       ),
       rejected
     )
+  assert.ok(
+    readConfig({
+      DISCORD_TOKEN: 'fake-token',
+      DISCORD_SUPPORT_ROLE_ID: 'helpers',
+    }).errors.some((error) => error.includes('DISCORD_SUPPORT_ROLE_ID'))
+  )
 })

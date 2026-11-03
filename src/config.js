@@ -11,6 +11,7 @@ export function readConfig(env = process.env) {
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
     welcomeChannelId: env.DISCORD_WELCOME_CHANNEL_ID?.trim() || null,
     welcomeRoleId: env.DISCORD_WELCOME_ROLE_ID?.trim() || null,
+    supportRoleId: env.DISCORD_SUPPORT_ROLE_ID?.trim() || null,
     supportChannelIds: (env.DISCORD_SUPPORT_CHANNEL_IDS ?? '')
       .split(',')
       .map((id) => id.trim())
@@ -81,14 +82,13 @@ export function readConfig(env = process.env) {
     if (config.featureReports && !config[key])
       errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
-  if (config.welcomeChannelId && !/^\d{17,20}$/.test(config.welcomeChannelId))
-    errors.push(
-      'DISCORD_WELCOME_CHANNEL_ID must be a Discord ID of 17 to 20 digits.'
-    )
-  if (config.welcomeRoleId && !/^\d{17,20}$/.test(config.welcomeRoleId))
-    errors.push(
-      'DISCORD_WELCOME_ROLE_ID must be a Discord ID of 17 to 20 digits.'
-    )
+  for (const [key, variable] of [
+    ['welcomeChannelId', 'DISCORD_WELCOME_CHANNEL_ID'],
+    ['welcomeRoleId', 'DISCORD_WELCOME_ROLE_ID'],
+    ['supportRoleId', 'DISCORD_SUPPORT_ROLE_ID'],
+  ])
+    if (config[key] && !/^\d{17,20}$/.test(config[key]))
+      errors.push(`${variable} must be a Discord ID of 17 to 20 digits.`)
   if (config.welcomeRoleId && config.welcomeRoleId === config.staffRoleId)
     errors.push(
       'DISCORD_WELCOME_ROLE_ID must not be DISCORD_STAFF_ROLE_ID, since every new member gets it.'

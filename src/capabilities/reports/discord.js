@@ -40,6 +40,8 @@ const fieldLabels = {
 const button = (id, label, style = ButtonStyle.Secondary) =>
   new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style)
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons)
+// Offered where an answer did not help, so a bug can skip the category step.
+export const bugReportRow = () => row(button('report:bug', 'Report a Bug'))
 
 export function reportControls(report) {
   if (!['collecting', 'ready'].includes(report.state)) return []
@@ -273,6 +275,10 @@ export function createReportDiscord(client, ctx) {
         if (prefix !== 'report') return
         if (action === 'start') {
           await begin(interaction)
+          return
+        }
+        if (action === 'bug') {
+          await interaction.showModal(reportModal())
           return
         }
         if (action === 'category' && interaction.isStringSelectMenu()) {
