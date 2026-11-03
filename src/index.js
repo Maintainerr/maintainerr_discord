@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js'
 import { config as loadEnv } from 'dotenv'
+import { createContext } from './runtime.js'
 import { readConfig } from './config.js'
 import capabilities from './capabilities/index.js'
 import { createCommandRegistry } from './commands/index.js'
@@ -19,7 +20,16 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
   partials: [Partials.Channel, Partials.Message],
 })
-const ctx = { config, logger }
+let ctx
+try {
+  ctx = await createContext(config, logger)
+} catch (err) {
+  logger.error(
+    'Could not initialize the bot. Check the database path and volume:',
+    describeError(err)
+  )
+  process.exit(1)
+}
 const enabledCapabilities = capabilities.filter((capability) =>
   capability.enabled(config)
 )
@@ -57,6 +67,7 @@ async function shutdown(signal) {
       describeError(err)
     )
   }
+  for (const cleanup of ctx.cleanup.toReversed()) await cleanup()
   process.exit(0)
 }
 

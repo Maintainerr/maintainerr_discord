@@ -18,4 +18,8 @@ RUN yarn install --frozen-lockfile --production
 
 COPY src ./src
 
+# Mount a named volume here; reports and pending jobs must survive replacement.
+RUN mkdir -p /data
+VOLUME ["/data"]
+
 CMD ["npm", "start"]

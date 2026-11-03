@@ -5,6 +5,7 @@ export function readConfig(env = process.env) {
     discordToken: env.DISCORD_TOKEN?.trim() ?? '',
     discordGuildId: env.DISCORD_GUILD_ID?.trim() || null,
     logLevel: env.LOG_LEVEL?.trim() || 'debug',
+    dbPath: env.MAINTAINERR_DISCORD_DB?.trim() || '/data/bot.sqlite',
   }
   const errors = []
 

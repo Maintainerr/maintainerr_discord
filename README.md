@@ -40,6 +40,7 @@ With podman:
 
 ```
 podman run -d --name maintainerr_discord \
+  -v maintainerr-discord-data:/data \
   -e DISCORD_TOKEN=your-token-here \
   ghcr.io/maintainerr/maintainerr_discord:latest
 ```
@@ -59,6 +60,11 @@ yarn start
 ```
 
 `yarn dev` runs the same thing under `node --watch`.
+
+The `/data` volume is required. SQLite stores pending jobs and reports in
+`/data/bot.sqlite`. Set `MAINTAINERR_DISCORD_DB=./data/bot.sqlite` when running from
+source if `/data` is not writable. Stop the bot before copying the database for
+backup so the WAL is checkpointed.
 
 ## Images
 
