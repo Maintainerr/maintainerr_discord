@@ -5,29 +5,35 @@ import testmedia from '../src/capabilities/testmedia/index.js'
 import info from '../src/capabilities/info/index.js'
 import { createCommandRegistry } from '../src/commands/index.js'
 
-test('registration removes a retired command and leaves unmanaged ones alone', async () => {
+test('registration removes retired commands in both scopes and leaves unmanaged ones alone', async () => {
   const deleted = []
   const created = []
-  const commands = {
+  const manager = (scope) => ({
     fetch: async () => [
-      { id: 'old', name: 'maintainerr' },
-      { id: 'theirs', name: 'unrelated-tool' },
+      { id: `${scope}-old`, name: 'maintainerr' },
+      { id: `${scope}-theirs`, name: 'unrelated-tool' },
     ],
-    create: async (command) => created.push(command.name),
+    create: async (command) => created.push(`${scope} ${command.name}`),
     edit: async () => {},
     delete: async (id) => deleted.push(id),
-  }
+  })
   const registry = createCommandRegistry(
     [testmedia],
     { config: { discordGuildId: 'guild' }, logger: { debug() {} } },
     capabilities
   )
   await registry.register({
-    application: {},
-    guilds: { fetch: async () => ({ id: 'guild', name: 'Guild', commands }) },
+    application: { commands: manager('global') },
+    guilds: {
+      fetch: async () => ({
+        id: 'guild',
+        name: 'Guild',
+        commands: manager('guild'),
+      }),
+    },
   })
-  assert.deepEqual(created, ['testmedia'])
-  assert.deepEqual(deleted, ['old'])
+  assert.deepEqual(created, ['guild testmedia'])
+  assert.deepEqual(deleted, ['guild-old', 'global-old'])
 })
 
 test('/help lists exactly the registered commands', async () => {
