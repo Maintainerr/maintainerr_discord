@@ -23,9 +23,8 @@ Anywhere in the server:
 - `/testmedia` opens a private DM where you can paste results, as many as you
   like, without starting a new session.
 - `/help` lists everything the bot can do, with links to the documentation.
-- `/delete` explains when Maintainerr takes action on your media, and `/unraid`
-  shows the Unraid steps for upgrading to v2.0.0. Both answers are public, so
-  you can post one in someone's thread.
+- `/delete` explains when Maintainerr takes action on your media. The answer is
+  public, so you can post it in someone's thread.
 
 To get your Test Media output:
 

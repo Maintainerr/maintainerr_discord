@@ -20,7 +20,7 @@ async function upsertCommands(commandManager, commands, managedNames) {
 
 // Commands this bot used to register. Only managed names are ever deleted, and
 // nothing defines these any more, so list them or they linger as dead commands.
-const RETIRED = ['maintainerr']
+const RETIRED = ['maintainerr', 'unraid']
 
 export function createCommandRegistry(
   capabilities,
