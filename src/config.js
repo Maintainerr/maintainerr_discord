@@ -10,6 +10,11 @@ export function readConfig(env = process.env) {
     launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
     supportChannelId: env.DISCORD_SUPPORT_CHANNEL_ID?.trim() || null,
+    githubAppId: env.GITHUB_APP_ID?.trim() || '',
+    githubInstallationId: env.GITHUB_INSTALLATION_ID?.trim() || '',
+    githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+    githubRepository:
+      env.GITHUB_REPOSITORY?.trim() || 'Maintainerr/Maintainerr',
     llmBaseUrl: env.LLM_BASE_URL?.trim() || '',
     llmApiKey: env.LLM_API_KEY || '',
     llmModel: env.LLM_MODEL?.trim() || '',
@@ -72,9 +77,36 @@ export function readConfig(env = process.env) {
     if (config.featureReports && key !== 'supportChannelId' && !config[key])
       errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
-  for (const key of ['docsRepository']) {
+  for (const key of ['githubRepository', 'docsRepository']) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(config[key]))
       errors.push(`${key} must have owner/name format.`)
+  }
+  config.githubEnabled =
+    config.featureReports &&
+    Boolean(
+      config.githubAppId &&
+        config.githubInstallationId &&
+        config.githubPrivateKey
+    )
+  if (
+    [
+      config.githubAppId,
+      config.githubInstallationId,
+      config.githubPrivateKey,
+    ].some(Boolean) &&
+    ![
+      config.githubAppId,
+      config.githubInstallationId,
+      config.githubPrivateKey,
+    ].every(Boolean)
+  ) {
+    errors.push(
+      'GITHUB_APP_ID, GITHUB_INSTALLATION_ID and GITHUB_PRIVATE_KEY must be configured together.'
+    )
+  }
+  for (const key of ['githubAppId', 'githubInstallationId']) {
+    if (config[key] && !/^\d+$/.test(config[key]))
+      errors.push(`${key} must be numeric.`)
   }
   for (const key of ['llmBaseUrl', 'docsOrigin']) {
     if (!config[key]) continue
