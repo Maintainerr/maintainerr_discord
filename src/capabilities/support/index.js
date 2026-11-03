@@ -34,7 +34,12 @@ export default {
         .trim()
       if (message.author.bot || !asked || !question) return
       if (await findPaste(message, ctx)) return
-      if (!reserveQuestion(ctx, message.author.id, message.id)) return
+      if (!reserveQuestion(ctx, message.author.id, message.id)) {
+        ctx.logger.debug(
+          `[answer] skipped ${message.author.tag} in ${where(message)}: cooldown or already answered`
+        )
+        return
+      }
       await message.reply({
         ...safeMessage(
           `${await ctx.answer(question)}\n-# Tip: paste your Test Media output here to have it explained.`
