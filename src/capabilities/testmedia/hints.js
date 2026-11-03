@@ -21,7 +21,12 @@ export function suggestFixes(payload) {
         const firstMissing = missing(rule.firstValue)
         const secondMissing =
           !UNARY_ACTIONS.has(rule.action) && missing(rule.secondValue)
-        if (firstMissing && /sw_lastWatched/i.test(rule.firstValueName ?? '')) {
+        if (
+          firstMissing &&
+          String(rule.firstValueName ?? '')
+            .toLowerCase()
+            .includes('sw_lastwatched')
+        ) {
           fixes.add(
             'An empty sw_lastWatched can mean nobody has watched this show. Add a separate rule for never-watched media instead of comparing an empty watch date.'
           )
@@ -29,10 +34,12 @@ export function suggestFixes(payload) {
           [
             ['first', firstMissing],
             ['second', secondMissing],
-          ].some(
-            ([side, absent]) =>
-              absent && /radarr|sonarr/i.test(rule[`${side}ValueName`] ?? '')
-          )
+          ].some(([side, absent]) => {
+            const name = String(rule[`${side}ValueName`] ?? '').toLowerCase()
+            return (
+              absent && (name.includes('radarr') || name.includes('sonarr'))
+            )
+          })
         ) {
           fixes.add(
             'The Radarr or Sonarr lookup returned no value. Check the integration connection, selected server and media mapping before changing the comparison. The rule failed closed.'

@@ -20,7 +20,7 @@ test('without a provider answering returns the three closest doc links', async (
   const answer = createAnswerer({ docs, logger: { debug() {} } })
   const text = await answer('How do I set a connection URL?')
   assert.equal((text.match(/https:\/\//g) ?? []).length, 3)
-  assert.match(text, /support bot/)
+  assert.match(text, /support bot/i)
 })
 
 test('provider failure or an ungrounded citation falls back to doc links', async (t) => {

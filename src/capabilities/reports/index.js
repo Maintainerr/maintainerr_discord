@@ -31,9 +31,9 @@ export default {
           )
       } catch (err) {
         ctx.logger.warn(
-          'Report setup failed. Check the forum, launcher and bot permissions:',
-          describeError(err)
+          'Report setup failed. Check the forum, launcher, and bot permissions.'
         )
+        ctx.logger.debug(describeError(err))
       }
     })
   },

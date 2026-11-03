@@ -103,7 +103,7 @@ export function createDiscordRelay(client, ctx) {
     },
     async comment(report, comment) {
       let remoteId
-      const text = `**GitHub reply from ${comment.user.login}**\n${comment.body}`
+      const text = `**GitHub Reply from ${comment.user.login}**\n${comment.body}`
       for (const [index, chunk] of chunkText(text, 1700).entries())
         remoteId = await relay.sendOnce(
           report.thread_id,

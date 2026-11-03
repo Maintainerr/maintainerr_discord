@@ -10,7 +10,7 @@ export function feedbackRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('support:unhelpful')
-      .setLabel('This did not help')
+      .setLabel('This Did Not Help')
       .setStyle(ButtonStyle.Secondary)
   )
 }

@@ -35,7 +35,7 @@ export function createAnswerer({ docs, provider, logger }) {
         logger.debug('Using documentation fallback:', describeError(err))
       }
     }
-    return `**Maintainerr support bot**\n${redactSecrets(text)
+    return `**Maintainerr Support Bot**\n${redactSecrets(text)
       .replace(/Overseerr|Jellyseerr/gi, 'Seerr')
       .slice(0, 1800)}`
   }

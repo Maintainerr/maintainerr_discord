@@ -9,7 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test test/",
-    "format": "npx --yes prettier@3.6.2 --write src test README.md package.json .prettierrc.json .github/workflows/pr-check.yml"
+    "format": "npx --yes prettier@3.6.2 --write src test README.md AGENTS.md package.json .prettierrc.json .github/workflows/pr-check.yml .github/workflows/tests.yml"
   },
   "dependencies": {
     "discord.js": "^14.28.0",

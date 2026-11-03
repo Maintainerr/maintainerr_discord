@@ -18,9 +18,9 @@ export async function createContext(config, logger) {
       )
     } catch (err) {
       logger.warn(
-        'Documentation refresh failed. Check network access; the previous index will be used.',
-        describeError(err)
+        'Documentation refresh failed. Check network access; the previous index will be used.'
       )
+      logger.debug(describeError(err))
     }
   }
   return ctx
