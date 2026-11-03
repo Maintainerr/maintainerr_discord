@@ -119,4 +119,21 @@ test('welcome cannot be enabled without its channel', () => {
       .errors,
     []
   )
+  for (const [env, rejected] of [
+    [{ DISCORD_WELCOME_ROLE_ID: '223456789012345678' }, false],
+    [{ DISCORD_WELCOME_ROLE_ID: 'everyone' }, true],
+    [
+      {
+        DISCORD_WELCOME_ROLE_ID: '223456789012345678',
+        DISCORD_STAFF_ROLE_ID: '223456789012345678',
+      },
+      true,
+    ],
+  ])
+    assert.equal(
+      readConfig({ DISCORD_TOKEN: 'fake-token', ...env }).errors.some((error) =>
+        error.includes('DISCORD_WELCOME_ROLE_ID')
+      ),
+      rejected
+    )
 })
