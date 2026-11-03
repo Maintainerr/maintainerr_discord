@@ -1,14 +1,5 @@
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'silent']
 
-const idList = (value = '') => [
-  ...new Set(
-    value
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean)
-  ),
-]
-
 export function readConfig(env = process.env) {
   const config = {
     discordToken: env.DISCORD_TOKEN?.trim() ?? '',
@@ -19,8 +10,10 @@ export function readConfig(env = process.env) {
     launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
     welcomeChannelId: env.DISCORD_WELCOME_CHANNEL_ID?.trim() || null,
-    supportChannelIds: idList(env.DISCORD_SUPPORT_CHANNEL_IDS),
-    selfRoleIds: idList(env.DISCORD_SELF_ROLE_IDS),
+    supportChannelIds: (env.DISCORD_SUPPORT_CHANNEL_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
     githubAppId: env.GITHUB_APP_ID?.trim() || '',
     githubInstallationId: env.GITHUB_INSTALLATION_ID?.trim() || '',
     githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replaceAll('\\n', '\n') || '',
@@ -99,18 +92,6 @@ export function readConfig(env = process.env) {
   if (config.supportChannelIds.some((id) => !/^\d{17,20}$/.test(id)))
     errors.push(
       'DISCORD_SUPPORT_CHANNEL_IDS must be a comma-separated list of Discord IDs.'
-    )
-  // Five rows of five buttons is all one Discord message can hold.
-  if (
-    config.selfRoleIds.length > 25 ||
-    config.selfRoleIds.some((id) => !/^\d{17,20}$/.test(id))
-  )
-    errors.push(
-      'DISCORD_SELF_ROLE_IDS must be a comma-separated list of at most 25 Discord IDs.'
-    )
-  if (config.staffRoleId && config.selfRoleIds.includes(config.staffRoleId))
-    errors.push(
-      'DISCORD_SELF_ROLE_IDS must not include DISCORD_STAFF_ROLE_ID, since anyone can take those roles.'
     )
   if (config.featureReports && !config.githubRepository)
     errors.push(
