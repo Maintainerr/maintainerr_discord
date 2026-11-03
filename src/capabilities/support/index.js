@@ -3,7 +3,7 @@ import { commands } from '../../commands/support.js'
 import { feedbackRow, reserveQuestion } from './handlers.js'
 import { safeMessage } from '../../lib/http.js'
 import { isTestMediaText } from '../testmedia/decoder.js'
-import { allowsScreenshot } from '../testmedia/scope.js'
+import { allowsScreenshot, inSupportChannel } from '../testmedia/scope.js'
 
 export default {
   name: 'support',
@@ -19,9 +19,15 @@ export default {
         )
       )
         return
+      // A forum post's opening message shares the thread's id, so this answers
+      // each post once instead of every reply in its thread.
+      const question =
+        ctx.config.supportChannelIds.includes(message.channelId) ||
+        (message.id === message.channelId &&
+          inSupportChannel(message, ctx.config))
       if (
         message.author.bot ||
-        message.channelId !== ctx.config.supportChannelId ||
+        !question ||
         !message.content.trim() ||
         isTestMediaText(message.content)
       )

@@ -88,3 +88,21 @@ test('reports cannot be enabled without naming the target repository', () => {
     !scratch.errors.some((error) => error.includes('GITHUB_REPOSITORY'))
   )
 })
+
+test('support channels are a comma-separated list of Discord IDs', () => {
+  const { config, errors } = readConfig({
+    DISCORD_TOKEN: 'fake-token',
+    DISCORD_SUPPORT_CHANNEL_IDS: '123456789012345678, 223456789012345678',
+  })
+  assert.deepEqual(config.supportChannelIds, [
+    '123456789012345678',
+    '223456789012345678',
+  ])
+  assert.deepEqual(errors, [])
+  assert.ok(
+    readConfig({
+      DISCORD_TOKEN: 'fake-token',
+      DISCORD_SUPPORT_CHANNEL_IDS: '123456789012345678,support',
+    }).errors.some((error) => error.includes('DISCORD_SUPPORT_CHANNEL_IDS'))
+  )
+})
