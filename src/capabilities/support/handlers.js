@@ -26,6 +26,16 @@ export function reserveQuestion(ctx, userId, questionId, now = Date.now()) {
   })
 }
 
+// One escalation per answer, however often its button is pressed.
+export function reserveEscalation(ctx, answerId, now = Date.now()) {
+  return ctx.store.transaction(() => {
+    const key = `support:escalated:${answerId}`
+    if (ctx.store.getCursor(key)) return false
+    ctx.store.setCursor(key, '', null, now)
+    return true
+  })
+}
+
 export async function handleAsk(interaction, ctx) {
   ctx.logger.debug(
     `[ask] ${interaction.user.tag} in ${interaction.guild ? `#${interaction.channel?.name}` : 'DM'}`

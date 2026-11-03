@@ -159,7 +159,12 @@ test('only bugs open the report form; feature ideas and questions go elsewhere',
       showModal: async (modal) => forms.push(modal.toJSON().custom_id),
       update: async (message) => replies.push(message.content),
     })
-  assert.deepEqual(forms, ['report:create:bug'])
+  // The Report a Bug button offered under an unhelpful answer skips the menu.
+  await discord.interaction({
+    customId: 'report:bug',
+    showModal: async (modal) => forms.push(modal.toJSON().custom_id),
+  })
+  assert.deepEqual(forms, ['report:create:bug', 'report:create:bug'])
   assert.ok(replies[0].includes('https://features.maintainerr.info/'))
   assert.ok(replies[1].includes('<#support-forum>'))
   assert.ok(replies[1].includes('/ask'))

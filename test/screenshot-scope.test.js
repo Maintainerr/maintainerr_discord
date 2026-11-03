@@ -171,3 +171,56 @@ test('support answers each forum post once, using its title, and leaves pastes t
   assert.equal(answered[0].payload.flags, MessageFlags.SuppressEmbeds)
   assert.match(answered[0].payload.content, /Tip: paste your Test Media output/)
 })
+
+test('This Did Not Help pings the support role once per answer, only in support channels', async (t) => {
+  const store = openDatabase(':memory:')
+  t.after(() => store.close())
+  const handlers = {}
+  support.register(
+    { user: { id: 'bot' }, on: (event, fn) => (handlers[event] = fn) },
+    {
+      config: {
+        featureReports: true,
+        supportRoleId: 'helpers',
+        supportChannelIds: ['support'],
+      },
+      store,
+      logger: { debug() {} },
+    }
+  )
+  const pings = []
+  const replies = []
+  const click = (user, answer, channelId, parentId) =>
+    handlers.interactionCreate({
+      isButton: () => true,
+      customId: 'support:unhelpful',
+      user: { id: user, tag: user },
+      guildId: 'guild',
+      channelId,
+      channel: {
+        parentId,
+        isThread: () => Boolean(parentId),
+        parent: { name: 'support' },
+        name: channelId,
+        send: async (message) => pings.push(message),
+      },
+      message: { id: answer },
+      reply: async (message) => replies.push(message),
+    })
+  await click('first', 'answer', 'post', 'support')
+  await click('second', 'answer', 'post', 'support')
+  await click('third', 'other-answer', 'general', null)
+  assert.equal(pings.length, 1)
+  assert.match(pings[0].content, /^<@&helpers>/)
+  assert.deepEqual(pings[0].allowedMentions, {
+    parse: [],
+    roles: ['helpers'],
+    users: [],
+  })
+  assert.equal(replies.length, 3)
+  for (const reply of replies)
+    assert.equal(
+      reply.components[0].toJSON().components[0].custom_id,
+      'report:bug'
+    )
+})

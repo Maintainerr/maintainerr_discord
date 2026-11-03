@@ -1,6 +1,7 @@
 import { MessageFlags } from 'discord.js'
 import { commands } from '../../commands/support.js'
-import { feedbackRow, reserveQuestion } from './handlers.js'
+import { feedbackRow, reserveEscalation, reserveQuestion } from './handlers.js'
+import { bugReportRow } from '../reports/discord.js'
 import { safeMessage } from '../../lib/http.js'
 import { findPaste } from '../testmedia/decoder.js'
 import { where } from '../../lib/logging.js'
@@ -48,13 +49,31 @@ export default {
         interaction.customId !== 'support:unhelpful'
       )
         return
-      ctx.logger.debug(`[unhelpful] ${interaction.user.tag}`)
+      ctx.logger.debug(
+        `[unhelpful] ${interaction.user.tag} in ${where(interaction)}`
+      )
+      const role = ctx.config.supportRoleId
+      const escalates =
+        Boolean(role) && inSupportChannel(interaction, ctx.config)
+      const lines = [
+        escalates
+          ? 'Thanks for letting us know. A maintainer has been notified and will take a look here, so add any details that might help.'
+          : 'Thanks for letting us know. Add more details here and a maintainer will take a look.',
+      ]
+      if (ctx.config.featureReports)
+        lines.push('If you think you found a bug, you can report it.')
       await interaction.reply({
-        ...safeMessage(
-          'Thanks for letting us know. Add more details here and a maintainer will take a look.'
-        ),
+        ...safeMessage(lines.join('\n')),
         flags: MessageFlags.Ephemeral,
+        components: ctx.config.featureReports ? [bugReportRow()] : [],
       })
+      if (escalates && reserveEscalation(ctx, interaction.message.id))
+        await interaction.channel.send(
+          safeMessage(
+            `<@&${role}> The documentation answer did not help <@${interaction.user.id}> here.`,
+            { roles: [role] }
+          )
+        )
     })
   },
 }
