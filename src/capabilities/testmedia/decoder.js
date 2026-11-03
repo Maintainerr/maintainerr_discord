@@ -154,10 +154,10 @@ async function sendGuidance(parsed, channel, ctx) {
   }
   const text = [
     fixes.length
-      ? `**Likely fix**\n${fixes.map((fix) => `- ${fix}`).join('\n')}`
+      ? `**Likely Fix**\n${fixes.map((fix) => `- ${fix}`).join('\n')}`
       : '',
     links.length
-      ? `**Rule documentation**\n${links.slice(0, 5).join('\n')}`
+      ? `**Rule Documentation**\n${links.slice(0, 5).join('\n')}`
       : '',
   ]
     .filter(Boolean)

@@ -91,18 +91,18 @@ back to docs links. The index refreshes at boot; a failed refresh keeps the last
 complete index. A fresh installation without an index asks for a maintainer if
 its first refresh fails. Questions have a 30 second per-user cooldown and each
 message is answered at most once. Auto answering is off until a support channel
-is explicitly configured. "This did not help" opens the report category selector
+is explicitly configured. "This Did Not Help" opens the report category selector
 when reports are enabled, otherwise it refers to a maintainer.
 
 With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher, collects
 a category and details, and creates a forum post immediately. The reporter can
-add raster images or small text logs, finish with Done or No files, edit, or
+add raster images or small text logs, finish with Done or No Files, edit, or
 cancel. Submissions are limited to three per hour with a 30 second cooldown.
 Unsupported files, oversized files and binary files disguised as text are rejected.
 Text is redacted before SQLite storage and again before GitHub publication.
 
 Without GitHub App credentials, reports stay in Discord. With credentials, a
-member with the staff role can open Staff actions and see an ephemeral Publish
+member with the staff role can open Staff Actions and see an ephemeral Publish
 button. Discord cannot hide individual buttons by role in a shared message;
 both opening that private menu and publishing re-fetch and check the staff role.
 Nothing publishes automatically. The App needs Issues read/write and Metadata

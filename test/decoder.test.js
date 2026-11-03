@@ -50,6 +50,6 @@ test('the same channel and DM paste produces identical breakdowns and guidance',
   )
   assert.equal(threads, 1)
   assert.ok(dm.some((message) => message.embeds?.length))
-  assert.ok(dm.some((message) => message.content?.includes('**Likely fix**')))
+  assert.ok(dm.some((message) => message.content?.includes('**Likely Fix**')))
   assert.deepEqual(channel, dm)
 })

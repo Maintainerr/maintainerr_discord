@@ -64,15 +64,17 @@ export async function downloadAttachment(
     throw new Error(`Attachment download returned HTTP ${response.status}.`)
   const bytes = await readLimited(response, maxBytes)
   if (!bytes.length) throw new Error('Empty files are not accepted.')
+  const filePrefix = bytes.subarray(0, 4).toString()
   const signatures = {
     'image/png': bytes
       .subarray(0, 8)
       .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
     'image/jpeg': bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255,
-    'image/gif': /^GIF8[79]a/.test(bytes.subarray(0, 6).toString('ascii')),
+    'image/gif': ['GIF87a', 'GIF89a'].includes(
+      bytes.subarray(0, 6).toString('ascii')
+    ),
     'image/webp':
-      bytes.subarray(0, 4).toString() === 'RIFF' &&
-      bytes.subarray(8, 12).toString() === 'WEBP',
+      filePrefix === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP',
   }
   if (classification.kind === 'image' && !signatures[classification.type])
     throw new Error('The file content does not match its image type.')
@@ -80,7 +82,9 @@ export async function downloadAttachment(
     classification.kind === 'text' &&
     (!isUtf8(bytes) ||
       bytes.includes(0) ||
-      /^(?:PK|MZ|Rar!|7z)/.test(bytes.subarray(0, 4).toString()) ||
+      ['PK', 'MZ', 'Rar!', '7z'].some((prefix) =>
+        filePrefix.startsWith(prefix)
+      ) ||
       (bytes[0] === 31 && bytes[1] === 139))
   )
     throw new Error(

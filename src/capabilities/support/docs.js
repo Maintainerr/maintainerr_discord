@@ -33,12 +33,14 @@ export function chunkDocument(
     }
     bodyLines = bodyLines.slice(end + 1)
   }
-  const page =
-    metadata.title || path.replace(/^docs\//, '').replace(/\.mdx?$/, '')
-  const route =
-    metadata.slug ||
-    `/${metadata.id || path.replace(/^docs\//, '').replace(/\.mdx?$/, '')}`
-  const pageUrl = new URL(route.replace(/\/?$/, '/'), origin).href
+  let documentPath = path.startsWith('docs/') ? path.slice(5) : path
+  if (documentPath.endsWith('.mdx')) documentPath = documentPath.slice(0, -4)
+  else if (documentPath.endsWith('.md'))
+    documentPath = documentPath.slice(0, -3)
+  const page = metadata.title || documentPath
+  const route = metadata.slug || `/${metadata.id || documentPath}`
+  const pageUrl = new URL(route.endsWith('/') ? route : `${route}/`, origin)
+    .href
   const chunks = []
   const seen = new Map()
   let heading = page
@@ -73,23 +75,35 @@ export function chunkDocument(
       const count = seen.get(id) ?? 0
       seen.set(id, count + 1)
       anchor = `#${id}${count ? `-${count}` : ''}`
-    } else if (!/^import\s/.test(line)) lines.push(line)
+    } else if (!(line.startsWith('import') && line[6]?.trim() === ''))
+      lines.push(line)
   }
   flush()
   return chunks
 }
 
 export function buildRuleMap(chunks) {
-  const rules = chunks.filter((chunk) =>
-    /(?:^|\/)Rules\.mdx$/.test(chunk.source_path)
+  const rules = chunks.filter(
+    (chunk) =>
+      chunk.source_path === 'Rules.mdx' ||
+      chunk.source_path.endsWith('/Rules.mdx')
   )
-  const normalize = (field) =>
-    field
-      .replace(/^(?:Plex|Jellyfin|Emby|Radarr|Sonarr|Seerr)\s*-\s*/i, '')
+  const normalize = (field) => {
+    const separator = field.indexOf('-')
+    const service = field.slice(0, separator).trimEnd().toLowerCase()
+    if (
+      separator >= 0 &&
+      ['plex', 'jellyfin', 'emby', 'radarr', 'sonarr', 'seerr'].includes(
+        service
+      )
+    )
+      field = field.slice(separator + 1).trimStart()
+    return field
       .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .replace(/_/g, ' ')
+      .replaceAll('_', ' ')
       .toLowerCase()
       .trim()
+  }
   const map = new Map()
   for (const chunk of rules) {
     for (const label of [
@@ -206,7 +220,10 @@ export async function refreshDocs(index, config, fetchFn = fetch) {
   if (tree.truncated || !tree.sha || !Array.isArray(tree.tree))
     throw new Error('Docs tree is incomplete.')
   const files = tree.tree.filter(
-    (entry) => entry.type === 'blob' && /^docs\/.*\.mdx?$/.test(entry.path)
+    (entry) =>
+      entry.type === 'blob' &&
+      entry.path.startsWith('docs/') &&
+      (entry.path.endsWith('.md') || entry.path.endsWith('.mdx'))
   )
   if (!files.length) throw new Error('Docs tree contains no documentation.')
   const source = JSON.stringify({

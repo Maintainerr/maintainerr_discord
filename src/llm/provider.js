@@ -48,7 +48,9 @@ export function createProvider(
 ) {
   if (!config.llmBaseUrl) return null
   const requests = queue ?? new RequestQueue({ rpm: config.llmRpm, wait, now })
-  const base = config.llmBaseUrl.replace(/\/$/, '')
+  const base = config.llmBaseUrl.endsWith('/')
+    ? config.llmBaseUrl.slice(0, -1)
+    : config.llmBaseUrl
   const endpoint = base.endsWith('/chat/completions')
     ? base
     : `${base}${base.endsWith('/v1') ? '' : '/v1'}/chat/completions`

@@ -14,12 +14,12 @@ import { safeMessage } from '../../lib/http.js'
 import { downloadAttachment } from '../../lib/attachments.js'
 import { describeError } from '../../lib/logging.js'
 
-const labels = { bug: 'Bug', feature: 'Feature request', question: 'Question' }
+const labels = { bug: 'Bug', feature: 'Feature Request', question: 'Question' }
 const fieldLabels = {
-  version: 'Maintainerr version and install method',
-  server: 'Media server and version',
-  happened: 'What happened, or what would you like to do?',
-  steps: 'Steps to reproduce, or your use case',
+  version: 'Maintainerr Version and Install Method',
+  server: 'Media Server and Version',
+  happened: 'What Happened or What Would You Like to Do',
+  steps: 'Steps to Reproduce or Your Use Case',
 }
 const button = (id, label, style = ButtonStyle.Secondary) =>
   new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style)
@@ -31,10 +31,10 @@ export function reportControls(report) {
       row(
         button(
           `report:resolved:${report.id}`,
-          'This solved it',
+          'This Solved It',
           ButtonStyle.Success
         ),
-        button(`report:unresolved:${report.id}`, 'Still need help'),
+        button(`report:unresolved:${report.id}`, 'Still Need Help'),
         button(`report:cancel:${report.id}`, 'Cancel')
       ),
     ]
@@ -43,20 +43,20 @@ export function reportControls(report) {
     report.state === 'collecting'
       ? [
           button(`report:done:${report.id}`, 'Done', ButtonStyle.Primary),
-          button(`report:done:${report.id}:none`, 'No files'),
+          button(`report:done:${report.id}:none`, 'No Files'),
         ]
       : []
   buttons.push(
     button(`report:edit:${report.id}`, 'Edit'),
     button(`report:cancel:${report.id}`, 'Cancel'),
-    button(`report:staff:${report.id}`, 'Staff actions')
+    button(`report:staff:${report.id}`, 'Staff Actions')
   )
   return [row(...buttons)]
 }
 
 export function reportSummary(report) {
   const fields = JSON.parse(report.fields)
-  return `**${labels[report.category]} report**\nState: ${report.state}\n\n${Object.entries(
+  return `**${labels[report.category]} Report**\nState: ${report.state}\n\n${Object.entries(
     fieldLabels
   )
     .map(([key, label]) => `**${label}**\n${fields[key]}`)
@@ -68,7 +68,7 @@ function reportModal(category, report) {
     .setCustomId(
       report ? `report:save:${report.id}` : `report:create:${category}`
     )
-    .setTitle(`${labels[category]} report`)
+    .setTitle(`${labels[category]} Report`)
   const fields = report ? JSON.parse(report.fields) : {}
   for (const [key, label] of Object.entries(fieldLabels)) {
     const input = new TextInputBuilder()
@@ -221,7 +221,7 @@ export function createReportDiscord(client, ctx) {
         'Need help with Maintainerr? File a report here. A maintainer reviews every report before publishing to GitHub.'
       ),
       components: [
-        row(button('report:start', 'Report a problem', ButtonStyle.Primary)),
+        row(button('report:start', 'Report a Problem', ButtonStyle.Primary)),
       ],
     }
     const message = existing
@@ -317,7 +317,7 @@ export function createReportDiscord(client, ctx) {
           const thread = await ensureThread(created)
           await interaction.editReply(
             safeMessage(
-              `Your report is open in <#${thread.id}>. Add images or text logs there, then choose Done or No files.`
+              `Your report is open in <#${thread.id}>. Add images or text logs there, then choose Done or No Files.`
             )
           )
           await triage(created, thread)
@@ -378,11 +378,10 @@ export function createReportDiscord(client, ctx) {
         await update(changed)
         await interaction.editReply(safeMessage(content))
       } catch (err) {
-        if (!(err instanceof ReportError))
-          ctx.logger.warn(
-            'Report action failed. Check Discord permissions:',
-            describeError(err)
-          )
+        if (!(err instanceof ReportError)) {
+          ctx.logger.warn('Report action failed. Check Discord permissions.')
+          ctx.logger.debug(describeError(err))
+        }
         const payload = safeMessage(
           err instanceof ReportError
             ? err.message

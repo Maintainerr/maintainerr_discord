@@ -18,14 +18,14 @@ export function issueBody(report, attachments) {
   const fields = JSON.parse(report.fields)
   return `${reportMarker(report.id)}\n${redactSecrets(
     [
-      `## Discord report: ${report.category}`,
-      `**Version and install method**\n${fields.version}`,
-      `**Media server**\n${fields.server}`,
-      `**What happened or requested behavior**\n${fields.happened}`,
-      `**Steps or use case**\n${fields.steps}`,
+      `## Discord Report: ${report.category}`,
+      `**Version and Install Method**\n${fields.version}`,
+      `**Media Server**\n${fields.server}`,
+      `**What Happened or Requested Behavior**\n${fields.happened}`,
+      `**Steps or Use Case**\n${fields.steps}`,
       ...attachments.map((file) =>
         file.content
-          ? `**${file.filename}**\n\n\`\`\`text\n${file.content.slice(0, 3000).replace(/```/g, "'''")}\n\`\`\``
+          ? `**${file.filename}**\n\n\`\`\`text\n${file.content.slice(0, 3000).replaceAll('```', "'''")}\n\`\`\``
           : `**${file.filename}**: see the Discord thread.`
       ),
       `Discord thread: https://discord.com/channels/${report.guild_id}/${report.thread_id}`,
@@ -122,7 +122,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
             'POST',
             `${github.root}/issues/${report.issue_number}/comments`,
             {
-              body: `${marker}\n**Discord reply from ${redactSecrets(payload.author)}**\n\n${redactSecrets(payload.body)}`,
+              body: `${marker}\n**Discord Reply from ${redactSecrets(payload.author)}**\n\n${redactSecrets(payload.body)}`,
             }
           )
         ).data
@@ -268,9 +268,9 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
             if (err.status === 403 || err.status === 429)
               blockedUntil = err.retryAt || now() + 60000
             logger.warn(
-              'GitHub sync failed. Check the App configuration and permissions:',
-              describeError(err)
+              'GitHub sync failed. Check the App configuration and permissions.'
             )
+            logger.debug(describeError(err))
           })
           .finally(() => {
             active = null

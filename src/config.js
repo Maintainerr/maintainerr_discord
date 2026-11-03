@@ -12,7 +12,7 @@ export function readConfig(env = process.env) {
     supportChannelId: env.DISCORD_SUPPORT_CHANNEL_ID?.trim() || null,
     githubAppId: env.GITHUB_APP_ID?.trim() || '',
     githubInstallationId: env.GITHUB_INSTALLATION_ID?.trim() || '',
-    githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+    githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replaceAll('\\n', '\n') || '',
     githubRepository:
       env.GITHUB_REPOSITORY?.trim() || 'Maintainerr/Maintainerr',
     llmBaseUrl: env.LLM_BASE_URL?.trim() || '',
