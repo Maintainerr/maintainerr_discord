@@ -1,6 +1,6 @@
 import { ChannelType } from 'discord.js'
 import { commands } from '../../commands/testmedia.js'
-import { allowsScreenshot } from './scope.js'
+import { allowsScreenshot, inSupportChannel } from './scope.js'
 import {
   handleDM,
   handleChannelMessage,
@@ -23,7 +23,10 @@ export default {
       )
         return
       if (message.channel.type === ChannelType.DM) await handleDM(message, ctx)
-      else if (ctx.config.featureSmartDecoder)
+      else if (
+        ctx.config.featureSmartDecoder &&
+        inSupportChannel(message, ctx.config)
+      )
         await handleChannelMessage(message, ctx)
     })
   },

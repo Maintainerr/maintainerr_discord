@@ -9,7 +9,10 @@ export function readConfig(env = process.env) {
     forumChannelId: env.DISCORD_FORUM_CHANNEL_ID?.trim() || null,
     launcherChannelId: env.DISCORD_LAUNCHER_CHANNEL_ID?.trim() || null,
     staffRoleId: env.DISCORD_STAFF_ROLE_ID?.trim() || null,
-    supportChannelId: env.DISCORD_SUPPORT_CHANNEL_ID?.trim() || null,
+    supportChannelIds: (env.DISCORD_SUPPORT_CHANNEL_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
     githubAppId: env.GITHUB_APP_ID?.trim() || '',
     githubInstallationId: env.GITHUB_INSTALLATION_ID?.trim() || '',
     githubPrivateKey: env.GITHUB_PRIVATE_KEY?.replaceAll('\\n', '\n') || '',
@@ -70,13 +73,16 @@ export function readConfig(env = process.env) {
     ['forumChannelId', 'DISCORD_FORUM_CHANNEL_ID'],
     ['launcherChannelId', 'DISCORD_LAUNCHER_CHANNEL_ID'],
     ['staffRoleId', 'DISCORD_STAFF_ROLE_ID'],
-    ['supportChannelId', 'DISCORD_SUPPORT_CHANNEL_ID'],
   ]) {
     if (config[key] && !/^\d{17,20}$/.test(config[key]))
       errors.push(`${variable} must be a Discord ID of 17 to 20 digits.`)
-    if (config.featureReports && key !== 'supportChannelId' && !config[key])
+    if (config.featureReports && !config[key])
       errors.push(`${variable} is required when FEATURE_REPORTS is enabled.`)
   }
+  if (config.supportChannelIds.some((id) => !/^\d{17,20}$/.test(id)))
+    errors.push(
+      'DISCORD_SUPPORT_CHANNEL_IDS must be a comma-separated list of Discord IDs.'
+    )
   if (config.featureReports && !config.githubRepository)
     errors.push(
       'GITHUB_REPOSITORY is required when FEATURE_REPORTS is enabled. There is no default: name the repository that issues should be opened in.'

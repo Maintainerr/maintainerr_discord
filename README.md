@@ -41,7 +41,7 @@ are reported together and do not print supplied values.
 | `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                                                                               |
 | `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Report launcher text channel. Required with reports; same server as the forum.                                                      |
 | `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish. Required with reports.                                                                                     |
-| `DISCORD_SUPPORT_CHANNEL_ID`  | empty                           | Opt into automatic answers in exactly this one channel. Requires support; empty means `/ask` only.                                  |
+| `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated channels or forums for channel pastes, screenshots and automatic answers. Empty means DMs and `/ask` only.          |
 | `GITHUB_APP_ID`               | empty                           | GitHub App ID. Configure all three App credentials together.                                                                        |
 | `GITHUB_INSTALLATION_ID`      | empty                           | App installation ID.                                                                                                                |
 | `GITHUB_PRIVATE_KEY`          | empty                           | App PEM private key. Literal `\n` sequences are expanded into newlines. Secret.                                                     |
@@ -71,15 +71,16 @@ and GitHub state sync need Manage Threads and access to the configured forum.
 
 ## Optional capabilities
 
-With `FEATURE_SMART_DECODER=true`, a recognized Test Media paste in a channel
-gets its own thread; ordinary conversation is ignored. Deterministic guidance
+With `FEATURE_SMART_DECODER=true`, a recognized Test Media paste in a support
+channel gets its own thread, and a paste inside a forum post is answered in that
+post. Ordinary conversation and other channels are ignored. Deterministic guidance
 covers empty watch dates, failed Radarr or Sonarr lookups, missing dates and
 missing comparison values. The formatter stays unchanged. Rule links are built
 from the headings, table labels and code identifiers in `Rules.mdx` at index time.
 If an exact field is absent from the docs, the closest generated section is used.
 
-With screenshots enabled, send an image in a DM, in the configured support
-channel, or with an explicit bot mention. Images in other channels are ignored.
+With screenshots enabled, send an image in a DM, in a support channel or forum
+post, or with an explicit bot mention. Images in other channels are ignored.
 Image reading also needs `LLM_VISION=true` and a
 configured vision provider. Without those, the bot asks for the copied text.
 Malformed or incomplete model output also falls back to asking for text.
@@ -90,8 +91,9 @@ configuring one. Provider failure, quota exhaustion, or invalid citations fall
 back to docs links. The index refreshes at boot; a failed refresh keeps the last
 complete index. A fresh installation without an index asks for a maintainer if
 its first refresh fails. Questions have a 30 second per-user cooldown and each
-message is answered at most once. Auto answering is off until a support channel
-is explicitly configured. "This Did Not Help" opens the report category selector
+message is answered at most once. Auto answering is off until support channels
+are configured. In a forum, the bot answers each post's opening message once and
+leaves the replies in that post alone. "This Did Not Help" opens the report category selector
 when reports are enabled, otherwise it refers to a maintainer.
 
 With `FEATURE_REPORTS=true`, the bot maintains one persistent launcher, collects
