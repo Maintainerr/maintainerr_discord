@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { parse } from 'dotenv'
+import { parse as parseYaml } from 'yaml'
 import { redactSecrets, redactObject } from '../src/lib/redaction.js'
 
 const envSecrets = {
@@ -143,6 +144,24 @@ test('quoted env values redact escaped quotes and multiline private keys', () =>
   )
   assert.doesNotMatch(compose, /fake/)
   assert.match(compose, /TZ: Europe\/Stockholm$/)
+  for (const quote of ['', "'", '"']) {
+    for (const style of ['|', '|-', '|+2', '>', '>-', '>2-']) {
+      const input = [
+        'environment:',
+        `  ${quote}QBITTORRENT_PASSWORD${quote}: ${style} # credential`,
+        '    fakeBlockOne',
+        '',
+        '    fakeBlockTwo',
+        '  TZ: Europe/Stockholm',
+      ].join('\n')
+      assert.match(parseYaml(input).environment.QBITTORRENT_PASSWORD, /fake/)
+      const clean = redactSecrets(input)
+      assert.doesNotMatch(clean, /fake/, input)
+      assert.ok(clean.includes(`${quote}QBITTORRENT_PASSWORD${quote}:`))
+      assert.ok(clean.endsWith('  TZ: Europe/Stockholm'))
+      assert.equal(redactSecrets(clean), clean)
+    }
+  }
 })
 
 test('standalone and incomplete PEM private keys are removed before egress', () => {

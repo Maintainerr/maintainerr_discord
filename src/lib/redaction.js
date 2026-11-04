@@ -61,7 +61,7 @@ function redactPrivateKeys(text) {
 // below the key, so those lines go; the key's own line is redacted later.
 function dropBlockScalars(text, key) {
   const header = new RegExp(
-    `^([\\t ]*)(?:-[\\t ]+)?${key}[\\t ]*:[\\t ]+[|>][1-9+-]*[\\t ]*(?:#.*)?\\r?$`,
+    `^([\\t ]*)(?:-[\\t ]+)?(["']?)${key}\\2[\\t ]*:[\\t ]+[|>][1-9+-]*[\\t ]*(?:#.*)?\\r?$`,
     'i'
   )
   const lines = text.split('\n')

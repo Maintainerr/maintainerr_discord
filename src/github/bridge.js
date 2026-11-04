@@ -194,7 +194,47 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
         )
           continue
         try {
+          const previous = store.getCursor(`github:comments:${issue.number}`)
+          const commentsSince =
+            previous?.cursor || new Date(report.created_at).toISOString()
+          const commentsPath = `${github.root}/issues/${issue.number}/comments?per_page=100&since=${encodeURIComponent(commentsSince)}`
+          const comments = await github.list(commentsPath)
+          let latest = commentsSince
+          for (const comment of comments) {
+            if (
+              !hasMarker(comment.body) &&
+              comment.user.type !== 'Bot' &&
+              !synced('github-discord', comment.id)
+            ) {
+              // Only a reply after the close reopens; a closing comment
+              // posted just before it must not undo the close.
+              if (
+                issue.state === 'closed' &&
+                comment.created_at > issue.closed_at
+              ) {
+                await github.request(
+                  'PATCH',
+                  `${github.root}/issues/${issue.number}`,
+                  { state: 'open' }
+                )
+                issue.state = 'open'
+              }
+              const remoteId = await relay.comment(report, {
+                ...comment,
+                body: redactSecrets(comment.body || ''),
+                user: {
+                  ...comment.user,
+                  login: redactSecrets(comment.user.login),
+                },
+              })
+              record('github-discord', comment.id, report.id, remoteId)
+            }
+            if ((comment.updated_at || comment.created_at) > latest)
+              latest = comment.updated_at || comment.created_at
+          }
+          // Sending a reply unarchives the thread, so apply the final state last.
           await relay.issueState(report, issue)
+          store.setCursor(`github:comments:${issue.number}`, latest)
         } catch (err) {
           if (![10003, 50001, 50013].includes(err.code)) throw err
           if (err.code === 10003) {
@@ -203,45 +243,7 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
               'true'
             )
           } else retry = true
-          continue
         }
-        const previous = store.getCursor(`github:comments:${issue.number}`)
-        const commentsSince =
-          previous?.cursor || new Date(report.created_at).toISOString()
-        const commentsPath = `${github.root}/issues/${issue.number}/comments?per_page=100&since=${encodeURIComponent(commentsSince)}`
-        const comments = await github.list(commentsPath)
-        let latest = commentsSince
-        for (const comment of comments) {
-          if (
-            !hasMarker(comment.body) &&
-            comment.user.type !== 'Bot' &&
-            !synced('github-discord', comment.id)
-          ) {
-            // Only a reply after the close reopens; a closing comment
-            // posted just before it must not undo the close.
-            if (
-              issue.state === 'closed' &&
-              comment.created_at > issue.closed_at
-            )
-              await github.request(
-                'PATCH',
-                `${github.root}/issues/${issue.number}`,
-                { state: 'open' }
-              )
-            const remoteId = await relay.comment(report, {
-              ...comment,
-              body: redactSecrets(comment.body || ''),
-              user: {
-                ...comment.user,
-                login: redactSecrets(comment.user.login),
-              },
-            })
-            record('github-discord', comment.id, report.id, remoteId)
-          }
-          if ((comment.updated_at || comment.created_at) > latest)
-            latest = comment.updated_at || comment.created_at
-        }
-        store.setCursor(`github:comments:${issue.number}`, latest)
       }
       // Keep the query stable for 304s. Advance the window after a full page.
       const watermark = issues.reduce(

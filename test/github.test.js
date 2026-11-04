@@ -292,8 +292,56 @@ test('unchanged poll makes one conditional request and closing and replying chan
     staff: true,
     guildId: 'scratch-guild',
   })
-  const bridge = env.bridge()
-  await bridge.runJobs()
+  await env.bridge().runJobs()
+  const messages = []
+  let failArchive = false
+  const thread = {
+    archived: false,
+    parentId: 'fake-forum',
+    appliedTags: [],
+    setArchived: async (archived) => {
+      if (archived && failArchive)
+        throw Object.assign(new Error('Missing Permissions'), { code: 50013 })
+      thread.archived = archived
+    },
+    messages: {
+      fetch: async () => ({
+        find: (predicate) => messages.find(predicate),
+        size: messages.length,
+      }),
+    },
+    send: async (payload) => {
+      assert.equal(thread.archived, false)
+      const message = {
+        ...payload,
+        id: `reply-${messages.length + 1}`,
+        author: { id: 'fake-bot' },
+      }
+      messages.push(message)
+      return message
+    },
+  }
+  const relay = createDiscordRelay({
+    user: { id: 'fake-bot' },
+    channels: {
+      fetch: async (id) => {
+        if (id === 'fake-thread') return thread
+        assert.equal(id, 'fake-forum')
+        return { availableTags: [] }
+      },
+    },
+  })
+  const request = env.github.request
+  env.github.request = async (...args) =>
+    structuredClone(await request(...args))
+  const bridge = () =>
+    createBridge({
+      store: env.store,
+      github: env.github,
+      relay,
+      logger,
+      now: () => Date.parse('2026-11-02T12:02:00Z'),
+    })
   env.issues[0].state = 'closed'
   env.issues[0].closed_at = '2026-11-02T12:00:00Z'
   // A maintainer's closing comment, posted before the close, keeps it closed.
@@ -303,14 +351,16 @@ test('unchanged poll makes one conditional request and closing and replying chan
     user: { login: 'fake-maintainer', type: 'User' },
     created_at: '2026-11-02T11:59:59Z',
   })
-  await bridge.poll()
+  await bridge().poll()
   assert.equal(env.issues[0].state, 'closed')
-  assert.deepEqual(env.relayed.at(-2), ['state', 'closed'])
-  assert.deepEqual(env.relayed.at(-1), ['comment', 122])
+  assert.equal(thread.archived, true)
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].content, /Fixed in the next release/)
   const before = env.requests.length
-  await bridge.poll()
+  await bridge().poll()
   assert.equal(env.requests.length - before, 1)
   assert.equal(env.requests.at(-1).options.etag, '"one"')
+  assert.equal(thread.archived, true)
   env.change()
   env.comments.push({
     id: 123,
@@ -318,12 +368,36 @@ test('unchanged poll makes one conditional request and closing and replying chan
     user: { login: 'fake-user', type: 'User' },
     created_at: '2026-11-02T12:00:01Z',
   })
-  await bridge.poll()
+  await bridge().poll()
   assert.equal(env.issues[0].state, 'open')
-  assert.deepEqual(env.relayed.at(-1), ['comment', 123])
-  env.change()
-  await bridge.poll()
-  assert.equal(env.relayed.filter(([kind]) => kind === 'comment').length, 2)
+  assert.equal(thread.archived, false)
+  assert.equal(messages.length, 2)
+  assert.match(messages[1].content, /Human reply/)
+  await bridge().poll()
+  assert.equal(messages.length, 2)
+
+  env.issues[0].state = 'closed'
+  env.issues[0].closed_at = '2026-11-02T12:01:00Z'
+  env.comments.push({
+    id: 124,
+    body: 'Closing reply',
+    user: { login: 'fake-maintainer', type: 'User' },
+    created_at: env.issues[0].closed_at,
+  })
+  env.store.deleteCursor('github:issues')
+  failArchive = true
+  await bridge().poll()
+  assert.equal(messages.length, 3)
+  assert.equal(env.store.getCursor('github:issues').etag, null)
+  failArchive = false
+  await bridge().poll()
+  assert.equal(env.issues[0].state, 'closed')
+  assert.equal(thread.archived, true)
+  assert.equal(messages.length, 3)
+  assert.equal(
+    env.requests.filter(({ method }) => method === 'PATCH').length,
+    1
+  )
 })
 
 test('a rate limit stops the rest of the claimed work until it expires', async (t) => {
