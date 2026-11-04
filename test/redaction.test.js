@@ -128,6 +128,21 @@ test('quoted env values redact escaped quotes and multiline private keys', () =>
   const output = redactSecrets(input)
   assert.doesNotMatch(output, /fakeStart|fakeEnd|fakeKeyStart|fakeKeyEnd/)
   assert.ok(output.startsWith('before QBITTORRENT_PASSWORD="[redacted]" after'))
+  // YAML: a doubled quote escapes a quote, and block scalars span lines.
+  const compose = redactSecrets(
+    [
+      "  QBITTORRENT_PASSWORD: 'fakeStart''fakeRemainder'",
+      '  PLEX_TOKEN: |-',
+      '    fakeBlockOne',
+      '',
+      '    fakeBlockTwo',
+      '  - SONARR_API_KEY: >',
+      '      fakeFolded',
+      '  TZ: Europe/Stockholm',
+    ].join('\n')
+  )
+  assert.doesNotMatch(compose, /fake/)
+  assert.match(compose, /TZ: Europe\/Stockholm$/)
 })
 
 test('standalone and incomplete PEM private keys are removed before egress', () => {
