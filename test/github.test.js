@@ -295,8 +295,18 @@ test('unchanged poll makes one conditional request and closing and replying chan
   const bridge = env.bridge()
   await bridge.runJobs()
   env.issues[0].state = 'closed'
+  env.issues[0].closed_at = '2026-11-02T12:00:00Z'
+  // A maintainer's closing comment, posted before the close, keeps it closed.
+  env.comments.push({
+    id: 122,
+    body: 'Fixed in the next release',
+    user: { login: 'fake-maintainer', type: 'User' },
+    created_at: '2026-11-02T11:59:59Z',
+  })
   await bridge.poll()
-  assert.deepEqual(env.relayed.at(-1), ['state', 'closed'])
+  assert.equal(env.issues[0].state, 'closed')
+  assert.deepEqual(env.relayed.at(-2), ['state', 'closed'])
+  assert.deepEqual(env.relayed.at(-1), ['comment', 122])
   const before = env.requests.length
   await bridge.poll()
   assert.equal(env.requests.length - before, 1)
@@ -313,7 +323,43 @@ test('unchanged poll makes one conditional request and closing and replying chan
   assert.deepEqual(env.relayed.at(-1), ['comment', 123])
   env.change()
   await bridge.poll()
-  assert.equal(env.relayed.filter(([kind]) => kind === 'comment').length, 1)
+  assert.equal(env.relayed.filter(([kind]) => kind === 'comment').length, 2)
+})
+
+test('a rate limit stops the rest of the claimed work until it expires', async (t) => {
+  const env = setup(t)
+  const second = env.reports.create({
+    guildId: 'scratch-guild',
+    reporterId: 'another-user',
+    category: 'bug',
+    fields,
+    now: 0,
+  })
+  env.reports.attachThread(second.id, 'another-thread', 'another-control')
+  env.reports.finish(second.id, 'another-user')
+  for (const report of [env.report, second])
+    env.reports.requestPublish(report.id, {
+      staff: true,
+      guildId: 'scratch-guild',
+    })
+  let calls = 0
+  env.github.list = async () => {
+    calls += 1
+    throw Object.assign(new Error('rate limited'), {
+      status: 429,
+      retryAt: Date.now() + 3600000,
+    })
+  }
+  await env.bridge().runJobs()
+  assert.equal(calls, 1)
+  // The second job was never claimed, so it keeps all of its attempts.
+  assert.deepEqual(
+    env.store.db
+      .prepare('SELECT attempts FROM jobs ORDER BY id')
+      .all()
+      .map((job) => job.attempts),
+    [1, 0]
+  )
 })
 
 test('a deleted report thread exhausts the job once and staff receive exactly one notice across restart', async (t) => {

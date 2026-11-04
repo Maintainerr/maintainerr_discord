@@ -217,7 +217,12 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
             comment.user.type !== 'Bot' &&
             !synced('github-discord', comment.id)
           ) {
-            if (issue.state === 'closed')
+            // Only a reply after the close reopens; a closing comment
+            // posted just before it must not undo the close.
+            if (
+              issue.state === 'closed' &&
+              comment.created_at > issue.closed_at
+            )
               await github.request(
                 'PATCH',
                 `${github.root}/issues/${issue.number}`,
@@ -257,7 +262,11 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
     },
     async runJobs() {
       if (repositoryChanged()) return
-      for (const job of store.claimBatch({ limit: 3, now: now() })) {
+      // One claim at a time: a rate limit must stop the rest of the batch, and
+      // claiming spends an attempt.
+      for (let count = 0; count < 3 && now() >= blockedUntil; count += 1) {
+        const [job] = store.claimBatch({ limit: 1, now: now() })
+        if (!job) break
         try {
           if (job.kind === 'publish') await bridge.publish(job.payload.reportId)
           else if (job.kind === 'comment') await bridge.relayReply(job.payload)
