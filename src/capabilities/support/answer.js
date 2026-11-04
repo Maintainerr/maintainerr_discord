@@ -23,9 +23,15 @@ export function createAnswerer({ docs, provider, logger }) {
   return async function answer(question) {
     const clean = redactSecrets(question).slice(0, 6000)
     const sections = docs.search(clean, 3)
-    const links = sections.map(
-      (section) => `- [${section.page}: ${section.heading}](${section.url})`
-    )
+    // Two chunks of one section share a URL; the model still gets both.
+    const links = [
+      ...new Map(
+        sections.map(({ page, heading, url }) => [
+          url,
+          `- [${page}: ${heading}](${url})`,
+        ])
+      ).values(),
+    ]
     const fallback = sections.length
       ? `Here are the closest documentation sections:\n${links.join('\n')}\n\nIf these do not answer your question, ask a maintainer.`
       : 'The documentation does not cover that question clearly. Please ask a maintainer.'

@@ -12,7 +12,9 @@ export function supportLines(config) {
   if (!config.supportChannelIds.length) return []
   return [
     `- Ask for help in ${supportChannels(config)}. Search there first, since your question may already be answered.`,
-    '- Paste your Test Media output in a post to have it explained.',
+    ...(config.featureSmartDecoder
+      ? ['- Paste your Test Media output in a post to have it explained.']
+      : []),
   ]
 }
 
@@ -22,7 +24,9 @@ export function welcomeText(member, config) {
     lines.push(`- Start with <#${member.guild.rulesChannelId}>.`)
   lines.push(
     ...supportLines(config),
-    '- `/ask` searches the documentation from any channel, and `/testmedia` explains a Test Media result privately in a DM.',
+    config.featureSupport
+      ? '- `/ask` searches the documentation from any channel, and `/testmedia` explains a Test Media result privately in a DM.'
+      : '- `/testmedia` explains a Test Media result privately in a DM.',
     '- `/help` lists everything the bot can do.',
     '',
     `How to use the bot: ${GUIDE_URL}`
