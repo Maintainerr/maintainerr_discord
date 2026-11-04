@@ -31,9 +31,9 @@ export function createDiscordRelay(client, ctx) {
           if (messages.size < 100) break
           before = messages.last().id
         }
-        const body = typeof content === 'function' ? await content() : content
-        return (await thread.send(safeMessage(`${body}\n${marker}`, { roles })))
-          .id
+        return (
+          await thread.send(safeMessage(`${content}\n${marker}`, { roles }))
+        ).id
       })()
       locks.set(key, work)
       try {

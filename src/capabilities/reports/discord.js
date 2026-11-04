@@ -77,6 +77,14 @@ export function reportSummary(report) {
     .join('\n\n')}\n\nReport ID: ${report.id}`
 }
 
+const submittedFields = (interaction) =>
+  Object.fromEntries(
+    Object.keys(fieldLabels).map((key) => [
+      key,
+      interaction.fields.getTextInputValue(key),
+    ])
+  )
+
 function reportModal(report) {
   const modal = new ModalBuilder()
     .setCustomId(report ? `report:save:${report.id}` : 'report:create:bug')
@@ -351,12 +359,7 @@ export function createReportDiscord(client, ctx) {
             guildId: interaction.guildId,
             reporterId: interaction.user.id,
             category: id,
-            fields: Object.fromEntries(
-              Object.keys(fieldLabels).map((key) => [
-                key,
-                interaction.fields.getTextInputValue(key),
-              ])
-            ),
+            fields: submittedFields(interaction),
           })
           const thread = await ensureThread(created)
           await interaction.editReply(
@@ -377,12 +380,7 @@ export function createReportDiscord(client, ctx) {
           changed = service.edit(
             id,
             interaction.user.id,
-            Object.fromEntries(
-              Object.keys(fieldLabels).map((key) => [
-                key,
-                interaction.fields.getTextInputValue(key),
-              ])
-            )
+            submittedFields(interaction)
           )
         else if (action === 'staff') {
           if (!(await staff(interaction)))
