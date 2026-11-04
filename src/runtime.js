@@ -12,16 +12,33 @@ export async function createContext(config, logger) {
   ctx.provider = createProvider(config, store)
   ctx.answer = createAnswerer(ctx)
   if (config.featureSupport || config.featureSmartDecoder) {
-    try {
-      logger.debug(
-        `Indexed ${await refreshDocs(ctx.docs, config)} documentation chunks.`
-      )
-    } catch (err) {
-      logger.warn(
-        'Documentation refresh failed. Check network access; the previous index will be used.'
-      )
-      logger.debug(describeError(err))
+    let active
+    const refresh = () => {
+      if (active) return active
+      active = (async () => {
+        try {
+          logger.debug(
+            `Indexed ${await refreshDocs(ctx.docs, config)} documentation chunks.`
+          )
+        } catch (err) {
+          logger.warn(
+            'Documentation refresh failed. Check network access; the previous index will be used.'
+          )
+          logger.debug(describeError(err))
+        }
+      })().finally(() => {
+        active = null
+      })
+      return active
     }
+    await refresh()
+    const timer = setInterval(refresh, 24 * 60 * 60 * 1000)
+    timer.unref()
+    ctx.cleanup.push(async () => {
+      clearInterval(timer)
+      // Finish indexing before the SQLite connection closes.
+      await active
+    })
   }
   return ctx
 }

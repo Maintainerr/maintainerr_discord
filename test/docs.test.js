@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate } from 'node:timers/promises'
 import { openDatabase } from '../src/db.js'
+import { createContext } from '../src/runtime.js'
 import {
   chunkDocument,
   createDocsIndex,
@@ -167,4 +169,111 @@ test('API reference pages are not indexed, and changing that rule forces a reind
   await refreshDocs(index, config, fetchFn)
   assert.deepEqual(downloads, ['Rules.mdx'])
   assert.equal(index.search('stale').length, 0)
+})
+
+test('runtime refreshes docs daily without overlap and drains the refresh on shutdown', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const day = 86400000
+  const requests = []
+  const warnings = []
+  let sha = 'first-sha'
+  let document = '# Rules\nOriginal guidance'
+  let failed = false
+  let pending
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requests.push(url)
+    if (url.includes('/git/trees/'))
+      return Response.json({
+        sha,
+        tree: [{ type: 'blob', path: 'docs/Rules.mdx' }],
+      })
+    if (pending) return pending.promise
+    return failed ? new Response('', { status: 503 }) : new Response(document)
+  })
+  const ctx = await createContext(
+    {
+      dbPath: ':memory:',
+      featureSupport: true,
+      docsRepository: 'Example/docs',
+      docsRef: 'main',
+      docsOrigin: 'https://docs.example.test',
+    },
+    { debug() {}, warn: (message) => warnings.push(message) }
+  )
+  t.after(async () => {
+    pending?.resolve(new Response(document))
+    for (const cleanup of ctx.cleanup.toReversed()) await cleanup()
+  })
+  const advance = async (milliseconds = day) => {
+    t.mock.timers.tick(milliseconds)
+    await setImmediate()
+  }
+  assert.equal(requests.length, 2)
+  await advance(day - 1)
+  assert.equal(requests.length, 2)
+  await advance(1)
+  assert.equal(requests.length, 3, 'unchanged SHA costs only the tree request')
+  sha = 'second-sha'
+  document = '# Rules\nRevised guidance'
+  await advance()
+  assert.equal(requests.length, 5)
+  assert.equal(ctx.docs.search('Revised').length, 1)
+  assert.equal(ctx.docs.search('Original').length, 0)
+  sha = 'third-sha'
+  failed = true
+  await advance()
+  assert.equal(warnings.length, 1)
+  assert.equal(ctx.docs.search('Revised').length, 1)
+  assert.equal(JSON.parse(ctx.docs.source()).sha, 'second-sha')
+  failed = false
+  document = '# Rules\nRecovered guidance'
+  await advance()
+  assert.equal(requests.length, 9)
+  assert.equal(ctx.docs.search('Recovered').length, 1)
+  sha = 'fourth-sha'
+  pending = Promise.withResolvers()
+  await advance()
+  assert.equal(requests.length, 11)
+  await advance()
+  assert.equal(requests.length, 11, 'an active refresh must not overlap')
+  let stopped = false
+  const stopping = ctx.cleanup
+    .at(-1)()
+    .then(() => (stopped = true))
+  await setImmediate()
+  assert.equal(stopped, false, 'SQLite must stay open until indexing finishes')
+  pending.resolve(new Response('# Rules\nFinal guidance'))
+  await stopping
+  assert.equal(ctx.docs.search('Final').length, 1)
+  await advance()
+  assert.equal(requests.length, 11, 'shutdown cancels future refreshes')
+})
+
+test('docs refresh retries after startup failure and stays disabled without either feature', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const fetchFn = t.mock.method(
+    globalThis,
+    'fetch',
+    async () => new Response('', { status: 503 })
+  )
+  for (const features of [
+    {},
+    { featureSupport: true },
+    { featureSmartDecoder: true },
+  ]) {
+    fetchFn.mock.resetCalls()
+    const ctx = await createContext(
+      { dbPath: ':memory:', ...features },
+      { debug() {}, warn() {} }
+    )
+    try {
+      const enabled = Object.keys(features).length > 0
+      assert.equal(fetchFn.mock.callCount(), enabled ? 1 : 0)
+      t.mock.timers.tick(86400000)
+      await setImmediate()
+      assert.equal(fetchFn.mock.callCount(), enabled ? 2 : 0)
+    } finally {
+      for (const cleanup of ctx.cleanup.toReversed()) await cleanup()
+    }
+  }
 })

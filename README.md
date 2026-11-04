@@ -76,6 +76,10 @@ plus Create Public Threads, Send Messages in Threads and Manage Threads for
 decoding and reports. Giving the welcome role needs Manage Roles, with the bot's
 role above it.
 
+Keep the support and staff roles unmentionable. Grant the bot Mention Everyone
+only in the support channels, reports forum and launcher channel where it sends
+role notifications.
+
 The GitHub App needs Issues read and write, and Metadata read. No webhook or
 inbound port is used.
 
@@ -94,7 +98,7 @@ and `0`. Configuration errors are listed together, without echoing values.
 | `FEATURE_WELCOME`             | `false`                         | Welcome new members.                                                    |
 | `FEATURE_SCREENSHOTS`         | `false`                         | Read Test Media screenshots.                                            |
 | `DISCORD_SUPPORT_CHANNEL_IDS` | empty                           | Comma-separated support channels or forums.                             |
-| `DISCORD_SUPPORT_ROLE_ID`     | empty                           | Role pinged when an answer did not help. Make it mentionable.           |
+| `DISCORD_SUPPORT_ROLE_ID`     | empty                           | Role pinged when an answer did not help. Keep unmentionable.            |
 | `DISCORD_FORUM_CHANNEL_ID`    | empty                           | Reports forum. Required with reports.                                   |
 | `DISCORD_LAUNCHER_CHANNEL_ID` | empty                           | Text channel for the Report a Bug launcher. Required with reports.      |
 | `DISCORD_STAFF_ROLE_ID`       | empty                           | Role allowed to publish reports. Required with reports.                 |
