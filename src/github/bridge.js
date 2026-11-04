@@ -37,6 +37,8 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
       botId = Number(store.getCursor('github:bot')?.cursor) || null
     return botId
   }
+  // A refused Discord update is retried every poll, so it warns once per outage.
+  let refusalLogged = false
   // Repository-relative history cannot safely be reassigned to a different target.
   let mismatchLogged = false
   const repositoryChanged = () => {
@@ -242,9 +244,19 @@ export function createBridge({ store, github, relay, logger, now = Date.now }) {
               `discord:deleted-thread:${report.thread_id}`,
               'true'
             )
-          } else retry = true
+          } else {
+            retry = true
+            if (!refusalLogged) {
+              refusalLogged = true
+              logger.warn(
+                `GitHub sync could not update the Discord post for #${issue.number}. Check the bot's permissions in the reports forum.`
+              )
+              logger.debug(describeError(err))
+            }
+          }
         }
       }
+      if (!retry) refusalLogged = false
       // Keep the query stable for 304s. Advance the window after a full page.
       const watermark = issues.reduce(
         (latest, issue) =>

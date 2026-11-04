@@ -14,7 +14,12 @@ export function createDiscordRelay(client, ctx) {
           throw Object.assign(new Error('Discord channel is unavailable.'), {
             code: 50001,
           })
-        if (thread.archived) await thread.setArchived(false)
+        if (thread.archived) {
+          await thread.setArchived(false)
+          ctx.logger.debug(
+            `[github] Unarchived ${thread.name} to post a message.`
+          )
+        }
         const marker = discordMarker(id)
         let before
         while (true) {
@@ -62,10 +67,17 @@ export function createDiscordRelay(client, ctx) {
         .filter((tag) => labels.has(tag.name))
         .map((tag) => tag.id)
         .slice(0, 5)
-      if (thread.archived) await thread.setArchived(false)
+      const wasArchived = Boolean(thread.archived)
+      if (wasArchived) await thread.setArchived(false)
       if (tags.join(',') !== [...thread.appliedTags].join(','))
         await thread.setAppliedTags(tags)
-      if (issue.state === 'closed') await thread.setArchived(true)
+      const closed = issue.state === 'closed'
+      if (closed) await thread.setArchived(true)
+      // The unarchive above only frees the tags, so log the net change.
+      if (closed !== wasArchived)
+        ctx.logger.debug(
+          `[github] ${closed ? 'Archived' : 'Unarchived'} ${thread.name} because #${issue.number} is ${issue.state}.`
+        )
     },
     async published(report, issue) {
       await ctx.reports.update(report)

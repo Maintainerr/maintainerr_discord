@@ -5,7 +5,7 @@ import {
   MessageFlags,
 } from 'discord.js'
 import { safeMessage } from '../../lib/http.js'
-import { describeError } from '../../lib/logging.js'
+import { describeError, where } from '../../lib/logging.js'
 import { inSupportChannel } from '../testmedia/scope.js'
 
 export function feedbackRow() {
@@ -60,9 +60,7 @@ export async function escalate(interaction, ctx) {
 }
 
 export async function handleAsk(interaction, ctx) {
-  ctx.logger.debug(
-    `[ask] ${interaction.user.tag} in ${interaction.guild ? `#${interaction.channel?.name}` : 'DM'}`
-  )
+  ctx.logger.debug(`[ask] ${interaction.user.tag} in ${where(interaction)}`)
   if (!reserveQuestion(ctx, interaction.user.id, interaction.id)) {
     await interaction.reply({
       ...safeMessage('Please wait 30 seconds between questions.'),

@@ -297,6 +297,7 @@ test('unchanged poll makes one conditional request and closing and replying chan
   let failArchive = false
   const thread = {
     archived: false,
+    name: 'Fake report [abcd1234]',
     parentId: 'fake-forum',
     appliedTags: [],
     setArchived: async (archived) => {
@@ -321,25 +322,29 @@ test('unchanged poll makes one conditional request and closing and replying chan
       return message
     },
   }
-  const relay = createDiscordRelay({
-    user: { id: 'fake-bot' },
-    channels: {
-      fetch: async (id) => {
-        if (id === 'fake-thread') return thread
-        assert.equal(id, 'fake-forum')
-        return { availableTags: [] }
+  const lines = []
+  const relay = createDiscordRelay(
+    {
+      user: { id: 'fake-bot' },
+      channels: {
+        fetch: async (id) => {
+          if (id === 'fake-thread') return thread
+          assert.equal(id, 'fake-forum')
+          return { availableTags: [] }
+        },
       },
     },
-  })
+    { logger: { debug: (line) => lines.push(line) } }
+  )
   const request = env.github.request
   env.github.request = async (...args) =>
     structuredClone(await request(...args))
-  const bridge = () =>
+  const bridge = (log = logger) =>
     createBridge({
       store: env.store,
       github: env.github,
       relay,
-      logger,
+      logger: log,
       now: () => Date.parse('2026-11-02T12:02:00Z'),
     })
   env.issues[0].state = 'closed'
@@ -386,11 +391,16 @@ test('unchanged poll makes one conditional request and closing and replying chan
   })
   env.store.deleteCursor('github:issues')
   failArchive = true
-  await bridge().poll()
+  const warnings = []
+  const live = bridge({ debug() {}, warn: (message) => warnings.push(message) })
+  // A refusal is retried every poll but warns once per outage.
+  await live.poll()
+  await live.poll()
+  assert.equal(warnings.length, 1)
   assert.equal(messages.length, 3)
   assert.equal(env.store.getCursor('github:issues').etag, null)
   failArchive = false
-  await bridge().poll()
+  await live.poll()
   assert.equal(env.issues[0].state, 'closed')
   assert.equal(thread.archived, true)
   assert.equal(messages.length, 3)
@@ -398,6 +408,15 @@ test('unchanged poll makes one conditional request and closing and replying chan
     env.requests.filter(({ method }) => method === 'PATCH').length,
     1
   )
+  failArchive = true
+  env.store.deleteCursor('github:issues')
+  await live.poll()
+  assert.equal(warnings.length, 2)
+  assert.deepEqual(lines, [
+    '[github] Archived Fake report [abcd1234] because #1 is closed.',
+    '[github] Unarchived Fake report [abcd1234] to post a message.',
+    '[github] Archived Fake report [abcd1234] because #1 is closed.',
+  ])
 })
 
 test('a rate limit stops the rest of the claimed work until it expires', async (t) => {
