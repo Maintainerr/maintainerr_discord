@@ -21,6 +21,22 @@ test('without a provider answering returns the three closest doc links', async (
   const text = await answer('How do I set a connection URL?')
   assert.equal((text.match(/https:\/\//g) ?? []).length, 3)
   assert.match(text, /support bot/i)
+  // Two chunks of one section are linked once.
+  const section = { page: 'Configuration', heading: 'Plex', content: '' }
+  const repeated = createAnswerer({
+    docs: {
+      search: () => [
+        { ...section, url: 'https://docs.example.test/configuration/#plex' },
+        { ...section, url: 'https://docs.example.test/configuration/#plex' },
+      ],
+    },
+    logger: { debug() {} },
+  })
+  assert.equal(
+    ((await repeated('Plex connection failed')).match(/https:\/\//g) ?? [])
+      .length,
+    1
+  )
 })
 
 test('provider failure or an ungrounded citation falls back to doc links', async (t) => {

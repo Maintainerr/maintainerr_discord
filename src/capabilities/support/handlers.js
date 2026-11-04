@@ -5,6 +5,8 @@ import {
   MessageFlags,
 } from 'discord.js'
 import { safeMessage } from '../../lib/http.js'
+import { describeError } from '../../lib/logging.js'
+import { inSupportChannel } from '../testmedia/scope.js'
 
 export function feedbackRow() {
   return new ActionRowBuilder().addComponents(
@@ -26,14 +28,35 @@ export function reserveQuestion(ctx, userId, questionId, now = Date.now()) {
   })
 }
 
-// One escalation per answer, however often its button is pressed.
-export function reserveEscalation(ctx, answerId, now = Date.now()) {
-  return ctx.store.transaction(() => {
-    const key = `support:escalated:${answerId}`
+// One ping per answer in a support channel, however often its button is
+// pressed. A failed ping releases its reservation so a later click retries.
+// Returns whether a maintainer has been told.
+export async function escalate(interaction, ctx) {
+  const role = ctx.config.supportRoleId
+  if (!role || !inSupportChannel(interaction, ctx.config)) return false
+  const key = `support:escalated:${interaction.message.id}`
+  const reserved = ctx.store.transaction(() => {
     if (ctx.store.getCursor(key)) return false
-    ctx.store.setCursor(key, '', null, now)
+    ctx.store.setCursor(key, '')
     return true
   })
+  if (!reserved) return true
+  try {
+    await interaction.channel.send(
+      safeMessage(
+        `<@&${role}> The documentation answer did not help <@${interaction.user.id}> here.`,
+        { roles: [role] }
+      )
+    )
+    return true
+  } catch (err) {
+    ctx.store.deleteCursor(key)
+    ctx.logger.warn(
+      'Support ping failed. Check the bot can post in the support channels.'
+    )
+    ctx.logger.debug(describeError(err))
+    return false
+  }
 }
 
 export async function handleAsk(interaction, ctx) {

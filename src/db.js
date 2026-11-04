@@ -150,6 +150,9 @@ export function openDatabase(path = '/data/bot.sqlite') {
         updated_at=excluded.updated_at`
       ).run(key, cursor, etag, now)
     },
+    deleteCursor(key) {
+      db.prepare('DELETE FROM poll_cursor WHERE key = ?').run(key)
+    },
     consumeDaily(key, limit, now = Date.now()) {
       return transaction(() => {
         const day = new Date(now).toISOString().slice(0, 10)

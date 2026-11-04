@@ -117,8 +117,13 @@ test('support answers each forum post once, using its title, and leaves pastes t
   const store = openDatabase(':memory:')
   t.after(() => store.close())
   const asked = []
+  const config = {
+    featureScreenshots: false,
+    featureSmartDecoder: true,
+    supportChannelIds: ['support'],
+  }
   const onMessage = capture(support.register, {
-    config: { featureScreenshots: false, supportChannelIds: ['support'] },
+    config,
     store,
     logger: { debug() {} },
     answer: async (question) => {
@@ -170,9 +175,15 @@ test('support answers each forum post once, using its title, and leaves pastes t
   assert.equal(asked[0], 'Why is my collection empty?\nhelp')
   assert.equal(answered[0].payload.flags, MessageFlags.SuppressEmbeds)
   assert.match(answered[0].payload.content, /Tip: paste your Test Media output/)
+  // Without the decoder, a pasted result would not be explained.
+  config.featureSmartDecoder = false
+  await onMessage(
+    message('later', 'later', 'support', 'sixth', 'More help?', 'Question')
+  )
+  assert.doesNotMatch(answered.at(-1).payload.content, /Tip:/)
 })
 
-test('This Did Not Help pings the support role once per answer, only in support channels', async (t) => {
+test('This Did Not Help pings the support role once per answer, only in support channels, and retries a failed ping', async (t) => {
   const store = openDatabase(':memory:')
   t.after(() => store.close())
   const handlers = {}
@@ -185,11 +196,12 @@ test('This Did Not Help pings the support role once per answer, only in support 
         supportChannelIds: ['support'],
       },
       store,
-      logger: { debug() {} },
+      logger: { debug() {}, warn() {} },
     }
   )
   const pings = []
   const replies = []
+  let unreachable = true
   const click = (user, answer, channelId, parentId) =>
     handlers.interactionCreate({
       isButton: () => true,
@@ -202,22 +214,35 @@ test('This Did Not Help pings the support role once per answer, only in support 
         isThread: () => Boolean(parentId),
         parent: { name: 'support' },
         name: channelId,
-        send: async (message) => pings.push(message),
+        send: async (message) => {
+          if (unreachable) {
+            unreachable = false
+            throw Object.assign(new Error('Missing Access'), { code: 50001 })
+          }
+          pings.push(message)
+        },
       },
       message: { id: answer },
-      reply: async (message) => replies.push(message),
+      deferReply: async () => {},
+      editReply: async (message) => replies.push(message),
     })
+  // The first ping fails, so nobody is told a maintainer was notified, and the
+  // next click on the same answer tries again.
   await click('first', 'answer', 'post', 'support')
   await click('second', 'answer', 'post', 'support')
-  await click('third', 'other-answer', 'general', null)
+  await click('third', 'answer', 'post', 'support')
+  await click('fourth', 'other-answer', 'general', null)
   assert.equal(pings.length, 1)
+  assert.deepEqual(
+    replies.map((reply) => reply.content.includes('has been notified')),
+    [false, true, true, false]
+  )
   assert.match(pings[0].content, /^<@&helpers>/)
   assert.deepEqual(pings[0].allowedMentions, {
     parse: [],
     roles: ['helpers'],
     users: [],
   })
-  assert.equal(replies.length, 3)
   for (const reply of replies)
     assert.equal(
       reply.components[0].toJSON().components[0].custom_id,

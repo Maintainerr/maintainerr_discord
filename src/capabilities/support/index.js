@@ -1,11 +1,14 @@
 import { MessageFlags } from 'discord.js'
 import { commands } from '../../commands/support.js'
-import { feedbackRow, reserveEscalation, reserveQuestion } from './handlers.js'
+import { escalate, feedbackRow, reserveQuestion } from './handlers.js'
 import { bugReportRow } from '../reports/discord.js'
 import { safeMessage } from '../../lib/http.js'
 import { findPaste } from '../testmedia/decoder.js'
 import { where } from '../../lib/logging.js'
 import { allowsScreenshot, inSupportChannel } from '../testmedia/scope.js'
+
+// Channel pastes are decoded only with the smart decoder.
+const TIP = '\n-# Tip: paste your Test Media output here to have it explained.'
 
 export default {
   name: 'support',
@@ -42,7 +45,7 @@ export default {
       }
       await message.reply({
         ...safeMessage(
-          `${await ctx.answer(question)}\n-# Tip: paste your Test Media output here to have it explained.`
+          `${await ctx.answer(question)}${ctx.config.featureSmartDecoder ? TIP : ''}`
         ),
         components: [feedbackRow()],
       })
@@ -57,28 +60,19 @@ export default {
       ctx.logger.debug(
         `[unhelpful] ${interaction.user.tag} in ${where(interaction)}`
       )
-      const role = ctx.config.supportRoleId
-      const escalates =
-        Boolean(role) && inSupportChannel(interaction, ctx.config)
+      // Deferred so the reply can say whether the ping went through.
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
       const lines = [
-        escalates
+        (await escalate(interaction, ctx))
           ? 'Thanks for letting us know. A maintainer has been notified and will take a look here, so add any details that might help.'
           : 'Thanks for letting us know. Add more details here and a maintainer will take a look.',
       ]
       if (ctx.config.featureReports)
         lines.push('If you think you found a bug, you can report it.')
-      await interaction.reply({
+      await interaction.editReply({
         ...safeMessage(lines.join('\n')),
-        flags: MessageFlags.Ephemeral,
         components: ctx.config.featureReports ? [bugReportRow()] : [],
       })
-      if (escalates && reserveEscalation(ctx, interaction.message.id))
-        await interaction.channel.send(
-          safeMessage(
-            `<@&${role}> The documentation answer did not help <@${interaction.user.id}> here.`,
-            { roles: [role] }
-          )
-        )
     })
   },
 }

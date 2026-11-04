@@ -2,7 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { GatewayIntentBits } from 'discord.js'
 import { gatewayIntents } from '../src/capabilities/index.js'
-import welcome, { GUIDE_URL } from '../src/capabilities/welcome/index.js'
+import welcome, {
+  GUIDE_URL,
+  welcomeText,
+} from '../src/capabilities/welcome/index.js'
 
 test('the privileged member intent is requested only while welcome is on', () => {
   const members = GatewayIntentBits.GuildMembers
@@ -25,6 +28,8 @@ test('a new member is greeted once, and only they are mentioned', async () => {
     },
     {
       config: {
+        featureSupport: true,
+        featureSmartDecoder: true,
         welcomeChannelId: 'welcome',
         supportChannelIds: ['support', 'rule-help'],
       },
@@ -55,7 +60,11 @@ test('a new member is greeted once, and only they are mentioned', async () => {
     '/help',
     GUIDE_URL,
   ])
-    assert.ok(sent[0].content.includes(part), part)
+    assert.ok(sent[0].content.includes(part), part) // Without support or the decoder, neither /ask nor paste decoding is offered.
+  const plain = welcomeText(member('newcomer', 'guild'), {
+    supportChannelIds: ['support'],
+  })
+  assert.doesNotMatch(plain, /\/ask|Paste your Test Media/)
 })
 
 test('new members get the welcome role once they have accepted the rules', async () => {
