@@ -12,7 +12,7 @@
     "format": "npx --yes prettier@3.6.2 --write src test README.md AGENTS.md package.json .prettierrc.json .github/workflows/pr-check.yml .github/workflows/tests.yml"
   },
   "dependencies": {
-    "discord.js": "^14.28.0",
+    "discord.js": "^14.28.1",
     "dotenv": "^18.0.9",
     "yaml": "^2.9.1"
   },
